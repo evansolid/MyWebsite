@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Media Lists</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    .inputs {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    .inputs label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .inputs input {
+      width: 100%;
+      padding: 6px;
+    }
+
+    .lists {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+
+    .list-column {
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+
+    .list-column h3 {
+      margin-top: 0;
+      text-align: center;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="inputs">
+    <div>
+      <label>Movies</label>
+      <input id="moviesInput" />
+    </div>
+    <div>
+      <label>Shows</label>
+      <input id="showsInput" />
+    </div>
+    <div>
+      <label>Books</label>
+      <input id="booksInput" />
+    </div>
+    <div>
+      <label>Games</label>
+      <input id="gamesInput" />
+    </div>
+    <div>
+      <label>Other</label>
+      <input id="otherInput" />
+    </div>
+  </div>
+
+  <div class="lists">
+    <div class="list-column">
+      <h3>Movies</h3>
+      <ul id="moviesList"></ul>
+    </div>
+    <div class="list-column">
+      <h3>Shows</h3>
+      <ul id="showsList"></ul>
+    </div>
+    <div class="list-column">
+      <h3>Books</h3>
+      <ul id="booksList"></ul>
+    </div>
+    <div class="list-column">
+      <h3>Games</h3>
+      <ul id="gamesList"></ul>
+    </div>
+    <div class="list-column">
+      <h3>Other</h3>
+      <ul id="otherList"></ul>
+    </div>
+  </div>
+
+  <script>
+    const lists = {
+      movies: new Set(),
+      shows: new Set(),
+      books: new Set(),
+      games: new Set(),
+      other: new Set()
+    };
+
+    function setupInput(type) {
+      const input = document.getElementById(type + "Input");
+      const listEl = document.getElementById(type + "List");
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const value = input.value.trim();
+          if (!value) return;
+
+          if (!lists[type].has(value)) {
+            lists[type].add(value);
+            const li = document.createElement("li");
+            li.textContent = value;
+            listEl.appendChild(li);
+          }
+
+          input.value = "";
+        }
+      });
+    }
+
+    ["movies", "shows", "books", "games", "other"].forEach(setupInput);
+  </script>
+
+</body>
+</html>
