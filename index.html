@@ -3,39 +3,55 @@
 <head>
   <meta charset="UTF-8" />
   <title>Media Lists</title>
+
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: system-ui, sans-serif;
       padding: 20px;
+      max-width: 1200px;
+      margin: auto;
     }
 
-    .inputs {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
+    h1 {
+      text-align: center;
+    }
+
+    .controls {
+      display: flex;
       gap: 10px;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    .inputs,
+    .lists {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
     }
 
     .inputs label {
       font-weight: bold;
       display: block;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
     }
 
-    .inputs input {
+    input[type="text"] {
       width: 100%;
       padding: 6px;
-    }
-
-    .lists {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
+      box-sizing: border-box;
     }
 
     .list-column {
       border: 1px solid #ccc;
       padding: 10px;
+      border-radius: 4px;
     }
 
     .list-column h3 {
@@ -44,36 +60,61 @@
     }
 
     ul {
-      padding-left: 20px;
+      padding-left: 18px;
+    }
+
+    li {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    li:hover {
+      text-decoration: line-through;
+      color: #c00;
+    }
+
+    .hint {
+      text-align: center;
+      font-size: 0.85em;
+      color: #555;
+      margin-top: 10px;
     }
   </style>
 </head>
+
 <body>
+
+  <h1>Media Lists</h1>
+
+  <div class="controls">
+    <button id="saveBtn">Save</button>
+    <input type="file" id="loadInput" accept="application/json" />
+  </div>
 
   <div class="inputs">
     <div>
       <label>Movies</label>
-      <input id="moviesInput" />
+      <input id="moviesInput" type="text" />
     </div>
     <div>
       <label>Shows</label>
-      <input id="showsInput" />
+      <input id="showsInput" type="text" />
     </div>
     <div>
       <label>Books</label>
-      <input id="booksInput" />
+      <input id="booksInput" type="text" />
     </div>
     <div>
       <label>Games</label>
-      <input id="gamesInput" />
+      <input id="gamesInput" type="text" />
     </div>
     <div>
       <label>Other</label>
-      <input id="otherInput" />
+      <input id="otherInput" type="text" />
     </div>
   </div>
 
-  <div class="lists">
+  <div class="lists" style="margin-top: 25px;">
     <div class="list-column">
       <h3>Movies</h3>
       <ul id="moviesList"></ul>
@@ -96,37 +137,114 @@
     </div>
   </div>
 
+  <div class="hint">
+    Press Enter to add · Click an item to remove it
+  </div>
+
   <script>
-    const lists = {
-      movies: new Set(),
-      shows: new Set(),
-      books: new Set(),
-      games: new Set(),
-      other: new Set()
-    };
+    const TYPES = ["movies", "shows", "books", "games", "other"];
+    const lists = {};
 
-    function setupInput(type) {
-      const input = document.getElementById(type + "Input");
-      const listEl = document.getElementById(type + "List");
+    /* ---------- Utilities ---------- */
 
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          const value = input.value.trim();
-          if (!value) return;
-
-          if (!lists[type].has(value)) {
-            lists[type].add(value);
-            const li = document.createElement("li");
-            li.textContent = value;
-            listEl.appendChild(li);
-          }
-
-          input.value = "";
-        }
-      });
+    function normalize(value) {
+      return value.trim().toLowerCase();
     }
 
-    ["movies", "shows", "books", "games", "other"].forEach(setupInput);
+    function save(type) {
+      localStorage.setItem(type, JSON.stringify([...lists[type]]));
+    }
+
+    function render(type) {
+      const ul = document.getElementById(type + "List");
+      ul.innerHTML = "";
+
+      [...lists[type]]
+        .sort((a, b) => a.localeCompare(b))
+        .forEach(item => {
+          const li = document.createElement("li");
+          li.textContent = item;
+
+          li.addEventListener("click", () => {
+            lists[type].delete(item);
+            save(type);
+            render(type);
+          });
+
+          ul.appendChild(li);
+        });
+    }
+
+    /* ---------- Setup ---------- */
+
+    TYPES.forEach(type => {
+      const saved = JSON.parse(localStorage.getItem(type)) || [];
+      lists[type] = new Set(saved);
+
+      render(type);
+
+      const input = document.getElementById(type + "Input");
+      input.addEventListener("keydown", e => {
+        if (e.key !== "Enter") return;
+
+        const raw = input.value;
+        const value = normalize(raw);
+        if (!value) return;
+
+        if (![...lists[type]].map(normalize).includes(value)) {
+          lists[type].add(raw.trim());
+          save(type);
+          render(type);
+        }
+
+        input.value = "";
+      });
+    });
+
+    /* ---------- Save ---------- */
+
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      const data = {};
+      TYPES.forEach(type => {
+        data[type] = [...lists[type]];
+      });
+
+      const blob = new Blob(
+        [JSON.stringify(data, null, 2)],
+        { type: "application/json" }
+      );
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "media-lists.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    /* ---------- Load ---------- */
+
+    document.getElementById("loadInput").addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+
+          TYPES.forEach(type => {
+            lists[type] = new Set(data[type] || []);
+            save(type);
+            render(type);
+          });
+        } catch {
+          alert("Invalid file.");
+        }
+      };
+
+      reader.readAsText(file);
+    });
   </script>
 
 </body>
