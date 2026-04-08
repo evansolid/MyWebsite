@@ -1,15 +1,12 @@
 <!DOCTYPE html>
-<html lang="en-US">
 <head>
-	<title>Beeeees</title>
+	<title>CS263 Website</title>
 	<link rel="stylesheet" href = "mystyle.css">
 </head>
 <body>
-	<h1>Welcome Back From Spring Break!</h1>
-	<h2>Evan Solid</h2>
-	<p>Over break I went to Madison, Wisconsin and toured Epic Systems' campus, which had many cool things to see. Every building is decorated with a different theme such as wild west or Wizard of Oz.</p>
-	<p>I also went home to see my dog Sophie. She is 12 weeks old and is a labrador Golden retriever mix.</p>
-	
+	<h1 id="heading">Hello World!<h1>
+	<button id="myButton">Click me!</button>
+
 	<!-- Tab links -->
 	<div class="tab">
 	  <button class="tablinks" onclick="openCity(event, 'London')">London</button>
@@ -53,6 +50,14 @@
 		  document.getElementById(cityName).style.display = "block";
 		  evt.currentTarget.className += " active";
 		}
+	</script>
+	<script>
+		const button = document.getElementById("myButton");
+		const heading = document.getElementById("heading");
+
+		button.addEventListener("click", function(){
+			heading.style.color = "blue";
+		});
 	</script>
 </body>
 </html>
