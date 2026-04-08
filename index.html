@@ -9,6 +9,7 @@
 	<h2>Evan Solid</h2>
 	<p>Over break I went to Madison, Wisconsin and toured Epic Systems' campus, which had many cool things to see. Every building is decorated with a different theme such as wild west or Wizard of Oz.</p>
 	<p>I also went home to see my dog Sophie. She is 12 weeks old and is a labrador Golden retriever mix.</p>
+	
 	<!-- Tab links -->
 	<div class="tab">
 	  <button class="tablinks" onclick="openCity(event, 'London')">London</button>
@@ -31,5 +32,27 @@
 	  <h3>Tokyo</h3>
 	  <p>Tokyo is the capital of Japan.</p>
 	</div>
+	<script>
+		function openCity(evt, cityName) {
+		  // Declare all variables
+		  var i, tabcontent, tablinks;
+		
+		  // Get all elements with class="tabcontent" and hide them
+		  tabcontent = document.getElementsByClassName("tabcontent");
+		  for (i = 0; i < tabcontent.length; i++) {
+		    tabcontent[i].style.display = "none";
+		  }
+		
+		  // Get all elements with class="tablinks" and remove the class "active"
+		  tablinks = document.getElementsByClassName("tablinks");
+		  for (i = 0; i < tablinks.length; i++) {
+		    tablinks[i].className = tablinks[i].className.replace(" active", "");
+		  }
+		
+		  // Show the current tab, and add an "active" class to the button that opened the tab
+		  document.getElementById(cityName).style.display = "block";
+		  evt.currentTarget.className += " active";
+		}
+	</script>
 </body>
 </html>
