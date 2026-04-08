@@ -1,64 +1,28 @@
 <!DOCTYPE html>
-<head>
-	<title>CS263 Website</title>
-	<link rel="stylesheet" href = "mystyle.css">
-</head>
+<html>
 <body>
-	<h1 id="heading">Welcome to my Website!<h1>
-	<button id="myButton">Click here</button>
-
-	<!-- Tab links -->
-	<div class="tab">
-	  <button class="tablinks" onclick="openCity(event, 'London')">London</button>
-	  <button class="tablinks" onclick="openCity(event, 'Paris')">Paris</button>
-	  <button class="tablinks" onclick="openCity(event, 'Tokyo')">Tokyo</button>
-	</div>
-	
-	<!-- Tab content -->
-	<div id="Quiz" class="tabcontent">
-		<h3>What is your favorite color?</h3>
-		<label><input type="radio" name="q1" value="a"> Document Object Model</label><br>
-		<label><input type="radio" name="q1" value="b"> Dormant Old Mouse</label>
-	</div>
-	
-	<div id="Test" class="tabcontent">
-	  <p>Paris is the capital of France.</p>
-	</div>
-	
-	<div id="Bees" class="tabcontent">
-	  <p>Tokyo is the capital of Japan.</p>
-	</div>
-	<script>
-		function openCity(evt, cityName) {
-		  // Declare all variables
-		  var i, tabcontent, tablinks;
-		
-		  // Get all elements with class="tabcontent" and hide them
-		  tabcontent = document.getElementsByClassName("tabcontent");
-		  for (i = 0; i < tabcontent.length; i++) {
-		    tabcontent[i].style.display = "none";
-		  }
-		
-		  // Get all elements with class="tablinks" and remove the class "active"
-		  tablinks = document.getElementsByClassName("tablinks");
-		  for (i = 0; i < tablinks.length; i++) {
-		    tablinks[i].className = tablinks[i].className.replace(" active", "");
-		  }
-		
-		  // Show the current tab, and add an "active" class to the button that opened the tab
-		  document.getElementById(cityName).style.display = "block";
-		  evt.currentTarget.className += " active";
-		}
-	</script>
-	<script>
-		const button = document.getElementById("myButton");
-		const heading = document.getElementById("heading");
-		const colors = ["red", "orange", "yellow", "green", "blue", "purple", "black", "white"]
-		const i = Math.floor(Math.random() * colors.length);
-		const color = color[i];
-		button.addEventListener("click", function(){
-			heading.style.color = color;
-		});
-	</script>
+<form id="myQuiz">
+<div class="question">
+<p>1. What does DOM stand for?</p>
+<label><input type="radio" name="q1" value="a"> Document Object
+Model</label><br>
+<label><input type="radio" name="q1" value="b"> Dormant Old
+Mouse</label>
+</div>
+<button type="button" onclick="calculateScore()">Submit</button>
+</form>
+<div id="result"></div>
 </body>
 </html>
+<script>
+function calculateScore() {
+const answers = { q1: "a" };
+let score = 0;
+const form = document.getElementById('myQuiz');
+const formData = new FormData(form);
+for (let [key, value] of formData.entries()) {
+if (value === answers[key]) score++;
+}
+document.getElementById('result').innerText = `Your score: ${score}`;
+}
+</script>
