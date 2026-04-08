@@ -15,18 +15,17 @@
 	</div>
 	
 	<!-- Tab content -->
-	<div id="London" class="tabcontent">
-	  <h3>London</h3>
-	  <p>London is the capital city of England.</p>
+	<div id="Quiz" class="tabcontent">
+		<h3>What is your favorite color?</h3>
+		<label><input type="radio" name="q1" value="a"> Document Object Model</label><br>
+		<label><input type="radio" name="q1" value="b"> Dormant Old Mouse</label>
 	</div>
 	
-	<div id="Paris" class="tabcontent">
-	  <h3>Paris</h3>
+	<div id="Test" class="tabcontent">
 	  <p>Paris is the capital of France.</p>
 	</div>
 	
-	<div id="Tokyo" class="tabcontent">
-	  <h3>Tokyo</h3>
+	<div id="Bees" class="tabcontent">
 	  <p>Tokyo is the capital of Japan.</p>
 	</div>
 	<script>
@@ -54,9 +53,9 @@
 	<script>
 		const button = document.getElementById("myButton");
 		const heading = document.getElementById("heading");
-		let colors = ["red", "orange", "yellow", "green", "blue", "purple", "black", "white"]
-		let i = Math.floor(Math.random() * colors.length);
-		let color = color[i];
+		const colors = ["red", "orange", "yellow", "green", "blue", "purple", "black", "white"]
+		const i = Math.floor(Math.random() * colors.length);
+		const color = color[i];
 		button.addEventListener("click", function(){
 			heading.style.color = color;
 		});
