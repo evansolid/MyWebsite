@@ -4,8 +4,8 @@
 	<link rel="stylesheet" href = "mystyle.css">
 </head>
 <body>
-	<h1 id="heading">Hello World!<h1>
-	<button id="myButton">Click me!</button>
+	<h1 id="heading">Welcome to my Website!<h1>
+	<button id="myButton">Click here</button>
 
 	<!-- Tab links -->
 	<div class="tab">
@@ -54,9 +54,11 @@
 	<script>
 		const button = document.getElementById("myButton");
 		const heading = document.getElementById("heading");
-
+		let colors = ["red", "orange", "yellow", "green", "blue", "purple", "black", "white"]
+		let i = Math.floor(Math.random() * colors.length);
+		let color = color[i];
 		button.addEventListener("click", function(){
-			heading.style.color = "blue";
+			heading.style.color = color;
 		});
 	</script>
 </body>
