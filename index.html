@@ -9,7 +9,7 @@
     <button id="myButton">Click here!</button>
     
     <div class="tab">
-      <button class="tablinks" onclick="openTab(event, 'Final')">Final Project</button>
+      <button class="tablinks" onclick="openTab(event, 'Final')" id="defaultOpen">Final Project</button>
       <button class="tablinks" onclick="openTab(event, 'Art')">My Art</button>
       <button class="tablinks" onclick="openTab(event, 'Books')">Books</button>
     </div>
@@ -31,8 +31,11 @@
   <script>
     const button = document.getElementById("myButton");
     const heading = document.getElementById("heading");
+	const colors = ["red", "orange", "blue", "green", "yellow", "purple"];
     button.addEventListener("click", function() {
-      heading.style.color = "blue";
+	  const index = Math.floor(Math.random() * colors.length);
+	  const randomColor = colors[randomIndex];
+      heading.style.color = randomColor;
     });
 
 	function openTab(evt, tabName) {
@@ -55,5 +58,7 @@
 	  document.getElementById(tabName).style.display = "block";
 	  evt.currentTarget.className += " active";
 	} 
+
+	document.getElementById("defaultOpen").click();
   </script>
 </html>
