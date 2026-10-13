@@ -1,14 +1,15 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chat test</title>
+<title>Bomb Game</title>
 <style>
-  body { font-family: sans-serif; max-width: 600px; margin: 2em auto; padding: 0 1em; }
-  #log { border: 1px solid #888; height: 300px; overflow-y: auto; padding: .5em; margin: .5em 0; }
+  body { font-family: sans-serif; max-width: 560px; margin: 2em auto; padding: 0 1em; }
+  button { margin: 2px; padding: 6px 10px; }
+  #banner { padding: .6em; border: 2px solid #c00; margin: .6em 0; font-weight: bold; }
   .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: gray; }
 </style>
 
-<h2><span class="dot" id="dot"></span> Chat test</h2>
+<h2><span class="dot" id="dot"></span> Bomb Game</h2>
 
 <div id="lobby">
   <input id="name" placeholder="Your name" maxlength="16">
@@ -19,21 +20,30 @@
 
 <div id="room" hidden>
   <div>Room <b id="roomcode"></b> · ping <span id="ping">–</span> ms · <span id="status"></span></div>
-  <div id="players"></div>
-  <div id="log"></div>
-  <input id="msg" placeholder="Type a message" size="40">
-  <button id="send">Send</button>
+  <div id="game"></div>
+  <button id="leave">Leave room</button>
+  <button id="close" hidden>Close room (host)</button>
 </div>
 
 <script>
-const SERVER = 'wss://ws.evansolid.com';
+const SERVER = 'wss://ws.yourdomain.com';
+const KEY = 'bombSession';      // separate from the chat page's key
+const ENDGAME_AT = 2;           // holder wins when this many players remain (see notes)
 const $ = id => document.getElementById(id);
-let ws, session = JSON.parse(localStorage.getItem('session') || 'null');
-let retry = 0, pingTimer, players = [];
 
-function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+let ws, session = JSON.parse(localStorage.getItem(KEY) || 'null');
+let retry = 0, pingTimer;
+let me = null, host = null, players = [];   // from the server
+let pub = null;                // PUBLIC game state: every player has this
+let G = null;                  // FULL secret game state: the host's browser only
+let role = { bomb: false };    // my private info
+let choice = {};               // my unsent selections this round
 
+const send = obj => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); };
+
+// ---------- connection ----------
 function connect(first) {
+  if (ws) { ws.onclose = null; ws.close(); }
   ws = new WebSocket(SERVER);
   ws.onopen = () => {
     retry = 0;
@@ -46,65 +56,236 @@ function connect(first) {
   ws.onmessage = e => handle(JSON.parse(e.data));
   ws.onclose = () => {
     clearInterval(pingTimer);
-    $('status').textContent = 'disconnected, retrying...';
+    $('status').textContent = 'reconnecting...';
     $('dot').style.background = 'red';
-    if (session) {
-      setTimeout(() => connect({ t: 'rejoin', code: session.code, token: session.token }),
-                 Math.min(1000 * 2 ** retry++, 10000));
-    }
+    if (session) setTimeout(() => connect({ t: 'rejoin', code: session.code, token: session.token }),
+                            Math.min(1000 * 2 ** retry++, 10000));
   };
 }
 
-function showRoom(show) {
-  $('lobby').hidden = show;
-  $('room').hidden = !show;
-}
+function showRoom(show) { $('lobby').hidden = show; $('room').hidden = !show; }
 
-function addLine(text) {
-  const d = document.createElement('div');
-  d.textContent = text;
-  $('log').appendChild(d);
-  $('log').scrollTop = $('log').scrollHeight;
-}
-
-const nameOf = id => (players.find(p => p.id === id) || {}).name || '?';
-
-function renderPlayers() {
-  $('players').textContent = 'Players: ' +
-    players.map(p => p.name + (p.online ? '' : ' (offline)')).join(', ');
+function endSession() {
+  session = null; G = null; pub = null; role = { bomb: false }; choice = {};
+  localStorage.removeItem(KEY);
+  localStorage.removeItem('bombG');
+  showRoom(false);
 }
 
 function handle(m) {
   if (m.t === 'joined') {
+    me = m.id; host = m.host; players = m.players; pub = m.state;
     session = { code: m.code, token: m.token };
-    localStorage.setItem('session', JSON.stringify(session));
-    players = m.players;
+    localStorage.setItem(KEY, JSON.stringify(session));
     $('roomcode').textContent = m.code;
-    $('log').textContent = '';
-    m.log.forEach(e => addLine(nameOf(e.from) + ': ' + e.data.chat));
-    renderPlayers();
     showRoom(true);
+    ensureHost();
+    if (host !== me && host) act({ a: 'sync' });   // ask the host to resend my private role
+    render();
   } else if (m.t === 'players') {
-    players = m.players; renderPlayers();
+    host = m.host; players = m.players;
+    ensureHost();
+    if (host === me) hostCheck();
+    render();
+  } else if (m.t === 'state') {
+    if (!pub || pub.round !== m.data.round) choice = {};
+    pub = m.data;
+    render();
   } else if (m.t === 'relay') {
-    addLine(nameOf(m.from) + ': ' + m.data.chat);
+    onPrivate(m);
   } else if (m.t === 'pong') {
     $('ping').textContent = Math.round(performance.now() - m.ts);
+  } else if (m.t === 'closed') {
+    endSession(); alert('The host closed the room.');
   } else if (m.t === 'error') {
-    if (m.fatal) {
-      session = null; localStorage.removeItem('session'); showRoom(false);
-    }
+    if (m.fatal) endSession();
     alert(m.msg);
   }
 }
 
-$('create').onclick = () => connect({ t: 'create', game: 'chat', name: $('name').value });
+// An action goes to the host. If I AM the host, handle it locally.
+function act(data) {
+  if (host === me) hostReceive(me, data);
+  else send({ t: 'relay', to: host, data });
+}
+
+// Private messages arrive here
+function onPrivate(m) {
+  const d = m.data || {};
+  if (d.k === 'role') {
+    if (m.from === host) { role = { bomb: !!d.bomb }; render(); }   // only trust the host
+  } else if (host === me && G) {
+    hostReceive(m.from, d);
+  }
+}
+
+// ---------- HOST LOGIC (runs only in the host's browser) ----------
+function startGame() {
+  const ids = players.filter(p => p.online).map(p => p.id);
+  if (ids.length < 3) return alert('You need at least 3 players.');
+  const names = {};
+  players.forEach(p => { names[p.id] = p.name; });
+  G = { phase: 'round', round: 1, alive: ids, names, msg: '', winner: null,
+        holder: ids[Math.floor(Math.random() * ids.length)], votes: {}, pass: null };
+  publish();
+  sendRoles();
+}
+
+// Public view of the game: this is the only thing everyone gets to see.
+function publish() {
+  localStorage.setItem('bombG', JSON.stringify({ code: session.code, G }));
+  pub = {
+    phase: G.phase, round: G.round, alive: G.alive, names: G.names, msg: G.msg, winner: G.winner,
+    done: Object.keys(G.votes),                       // who has submitted (not what)
+    holder: G.phase === 'over' ? G.holder : null,     // revealed only at the end
+  };
+  send({ t: 'state', data: pub });   // stored on the server for rejoiners, relayed to others
+  render();
+}
+
+function giveRole(id) {
+  const bomb = G.holder === id;
+  if (id === me) { role = { bomb }; render(); }
+  else send({ t: 'relay', to: id, data: { k: 'role', bomb } });   // private message
+}
+function sendRoles() { if (G.phase === 'round') G.alive.forEach(giveRole); }
+
+function hostReceive(from, d) {
+  if (!G) return;
+  if (d.a === 'sync') { if (G.alive.includes(from)) giveRole(from); return; }
+  if (d.a !== 'act' || G.phase !== 'round' || !G.alive.includes(from)) return;
+  if (G.votes[from]) return;                                         // one submission per round
+  if (!G.alive.includes(d.vote) || d.vote === from) return;          // validate everything
+  if (from === G.holder) {
+    if (!G.alive.includes(d.pass) || d.pass === from) return;
+    G.pass = d.pass;
+  }
+  G.votes[from] = d.vote;
+  hostCheck();
+}
+
+// Drops players who left for good, then resolves the round once everyone online has acted
+function hostCheck() {
+  if (!G || G.phase !== 'round') return;
+  const present = new Set(players.map(p => p.id));
+  const online = new Set(players.filter(p => p.online).map(p => p.id));
+  const gone = G.alive.filter(id => !present.has(id));
+
+  if (gone.includes(G.holder)) {
+    G.phase = 'over'; G.winner = null; G.msg = 'The bomb holder left the game. Game over.';
+    return publish();
+  }
+  if (gone.length) {
+    G.alive = G.alive.filter(id => present.has(id));
+    gone.forEach(id => delete G.votes[id]);
+    if (G.alive.length <= ENDGAME_AT) { holderWins('Players left the game. '); return publish(); }
+  }
+  const need = G.alive.filter(id => online.has(id));
+  if (G.votes[G.holder] && need.length && need.every(id => G.votes[id])) resolve();
+  else publish();
+}
+
+function holderWins(prefix) {
+  G.phase = 'over'; G.winner = 'holder';
+  G.msg = prefix + '😈 ' + G.names[G.holder] + ' had the bomb and wins!';
+}
+
+function resolve() {
+  const n = G.alive.length;
+  const tally = {};
+  Object.values(G.votes).forEach(t => { tally[t] = (tally[t] || 0) + 1; });
+  const executed = Object.keys(tally).find(id => G.alive.includes(id) && tally[id] > n / 2) || null;
+
+  let msg = 'Votes: ' + (Object.keys(tally).map(id => G.names[id] + ' ' + tally[id]).join(', ') || 'none') + '. ';
+  if (executed) {
+    msg += G.names[executed] + ' was executed. ';
+    G.alive = G.alive.filter(id => id !== executed);
+  } else {
+    msg += 'Nobody got a majority. ';
+  }
+
+  if (executed && executed === G.holder) {
+    G.phase = 'over'; G.winner = 'survivors';
+    G.msg = msg + '💥 They had the bomb. It explodes, and everyone still alive wins!';
+  } else {
+    // bomb moves to the chosen player, unless that player was just executed
+    if (G.alive.includes(G.pass)) G.holder = G.pass;
+    if (G.alive.length <= ENDGAME_AT) holderWins(msg);
+    else { G.msg = msg; G.round++; }
+  }
+  G.votes = {}; G.pass = null;
+  publish();
+  sendRoles();
+}
+
+// Host recovery: reload secret state after a refresh, or end the game if it's lost
+function ensureHost() {
+  if (host !== me || G) return;
+  const s = JSON.parse(localStorage.getItem('bombG') || 'null');
+  if (s && session && s.code === session.code) { G = s.G; publish(); sendRoles(); return; }
+  if (pub && pub.phase === 'round') {
+    pub = { ...pub, phase: 'over', winner: null, holder: null, msg: 'The host left, so the game ended.' };
+    send({ t: 'state', data: pub });
+  }
+}
+
+// ---------- UI ----------
+function picker(label, key) {
+  const wrap = document.createElement('div');
+  wrap.append(label + ' ');
+  const sel = document.createElement('select');
+  sel.add(new Option('(choose)', ''));
+  pub.alive.filter(id => id !== me).forEach(id => sel.add(new Option(pub.names[id], id)));
+  sel.value = choice[key] || '';
+  sel.onchange = () => { choice[key] = sel.value; };
+  wrap.appendChild(sel);
+  $('game').appendChild(wrap);
+}
+
+function render() {
+  const el = $('game');
+  el.textContent = '';
+  $('close').hidden = host !== me;
+  const add = (tag, text) => { const d = document.createElement(tag); d.textContent = text; el.appendChild(d); return d; };
+  const nm = id => (pub && pub.names[id]) || '?';
+
+  if (!pub) {
+    add('p', 'In the room: ' + players.map(p => p.name + (p.online ? '' : ' (offline)')).join(', '));
+    if (host === me) add('button', 'Start game (3+ players)').onclick = startGame;
+    else add('p', 'Waiting for the host to start...');
+    return;
+  }
+  if (pub.phase === 'over') {
+    add('h3', 'Game over');
+    add('p', pub.msg);
+    if (pub.holder) add('p', 'The bomb holder was ' + nm(pub.holder) + '.');
+    if (host === me) add('button', 'Play again').onclick = startGame;
+    return;
+  }
+
+  add('h3', 'Round ' + pub.round);
+  if (pub.msg) add('div', pub.msg).id = 'banner';
+  add('p', 'Alive: ' + pub.alive.map(nm).join(', '));
+  if (!pub.alive.includes(me)) { add('p', 'You are out. Spectating.'); return; }
+
+  add('p', role.bomb ? '💣 YOU HAVE THE BOMB' : 'You do not have the bomb (for now).');
+  if (pub.done.includes(me)) {
+    add('p', 'Locked in. Waiting for: ' + pub.alive.filter(id => !pub.done.includes(id)).map(nm).join(', '));
+    return;
+  }
+  picker('Vote to execute:', 'vote');
+  if (role.bomb) picker('Pass the bomb to:', 'pass');
+  add('button', 'Submit').onclick = () => {
+    if (!choice.vote || (role.bomb && !choice.pass)) return alert('Make your choices first.');
+    act({ a: 'act', vote: choice.vote, pass: role.bomb ? choice.pass : null });
+    choice = {};
+  };
+}
+
+$('create').onclick = () => connect({ t: 'create', game: 'bomb', name: $('name').value });
 $('join').onclick = () => connect({ t: 'join', code: $('code').value, name: $('name').value });
-$('send').onclick = () => {
-  const text = $('msg').value.trim();
-  if (text) { send({ t: 'relay', data: { chat: text } }); $('msg').value = ''; }
-};
-$('msg').onkeydown = e => { if (e.key === 'Enter') $('send').click(); };
+$('leave').onclick = () => { send({ t: 'leave' }); if (ws) ws.close(); endSession(); };
+$('close').onclick = () => { if (confirm('Close the room for everyone?')) send({ t: 'close' }); };
 
 if (session) connect({ t: 'rejoin', code: session.code, token: session.token });
 </script>
