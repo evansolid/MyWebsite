@@ -1,1285 +1,391 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FRACTRAN // Particle Chemistry</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evan Solid</title>
 <style>
-  :root {
-    --bg: #05070b;
-    --panel-bg: #0d1117;
-    --panel-bg-alt: #10151d;
-    --border: #1b2330;
-    --text: #dbe4ee;
-    --text-dim: #6b7684;
-    --accent: #7dd3fc;
-    --accent-2: #fbbf24;
-    --mono: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0; height: 100%; width: 100%;
-    background: var(--bg); color: var(--text);
-    font-family: var(--sans); overflow: hidden;
-  }
-  .app { display: flex; height: 100vh; width: 100vw; }
-
-  /* -------- simulation pane -------- */
-  .sim-pane { position: relative; flex: 1 1 auto; min-width: 0; background: var(--bg); }
-  #sim-canvas { display: block; width: 100%; height: 100%; }
-  .hud { position: absolute; top: 16px; left: 18px; pointer-events: none; user-select: none; }
-  .hud-title {
-    font-family: var(--mono); font-size: 13px; letter-spacing: 3px; color: var(--accent);
-    text-shadow: 0 0 12px rgba(125,211,252,0.5);
-  }
-  .hud-title-sub {
-    display: block; font-size: 9px; letter-spacing: 2px; color: var(--text-dim);
-    margin-top: 3px; text-transform: uppercase; text-shadow: none;
-  }
-  .hud-readout { margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
-  .hud-readout span { color: var(--text); }
-  .hud-legend {
-    position: absolute; bottom: 16px; left: 18px; right: 18px;
-    display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; user-select: none;
-  }
-  .legend-chip {
-    font-family: var(--mono); font-size: 10px; color: var(--text-dim);
-    display: flex; align-items: center; gap: 5px;
-    background: rgba(13,17,23,0.65); padding: 3px 8px; border-radius: 20px;
-    border: 1px solid var(--border);
-  }
-  .legend-chip .dot { width: 7px; height: 7px; border-radius: 50%; }
-
-  /* -------- control panel -------- */
-  .panel {
-    flex: 0 0 400px; width: 400px; background: var(--panel-bg);
-    border-left: 1px solid var(--border); overflow-y: auto; padding-bottom: 40px;
-  }
-  .panel::-webkit-scrollbar { width: 8px; }
-  .panel::-webkit-scrollbar-thumb { background: #1e2734; border-radius: 4px; }
-  .panel-header {
-    padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; background: var(--panel-bg); z-index: 5;
-  }
-  .panel-header h1 { font-family: var(--mono); font-size: 14px; letter-spacing: 2px; margin: 0; }
-  .panel-header p { font-size: 11px; color: var(--text-dim); margin: 4px 0 0; }
-
-  .section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
-  .section-label {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--accent);
-    text-transform: uppercase; margin: 0 0 10px;
-  }
-
-  textarea#program-input {
-    width: 100%; min-height: 108px; background: var(--panel-bg-alt); color: var(--text);
-    border: 1px solid var(--border); border-radius: 6px; font-family: var(--mono);
-    font-size: 12px; padding: 10px; resize: vertical;
-  }
-  textarea#program-input:focus { outline: none; border-color: var(--accent); }
-
-  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  button {
-    font-family: var(--sans); font-size: 11px; letter-spacing: 0.3px;
-    background: transparent; color: var(--text); border: 1px solid var(--border);
-    border-radius: 5px; padding: 7px 11px; cursor: pointer; transition: all .15s ease;
-  }
-  button:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 10px rgba(125,211,252,0.15); }
-  button.primary { border-color: var(--accent); color: var(--accent); }
-
-  .fraction-list { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; max-height: 170px; overflow-y: auto; }
-  .fraction-row {
-    display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px;
-    background: var(--panel-bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px;
-  }
-  .fraction-idx { color: var(--text-dim); width: 14px; }
-  .fraction-text { flex: 1; color: var(--text); }
-  .fraction-count { color: var(--accent-2); min-width: 24px; text-align: right; }
-
-  .example-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-
-  .field { margin-top: 12px; }
-  .field label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
-  .field label .val { color: var(--accent); font-family: var(--mono); }
-  input[type=range] { width: 100%; accent-color: var(--accent); }
-  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-dim); }
-  .checkbox-row input { accent-color: var(--accent); }
-
-  .spawn-row { display: flex; gap: 6px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
-  select, input[type=number] {
-    background: var(--panel-bg-alt); color: var(--text); border: 1px solid var(--border);
-    border-radius: 5px; padding: 6px 8px; font-family: var(--mono); font-size: 11px;
-  }
-  input[type=number] { width: 70px; }
-
-  .matrix-wrap {
-    overflow: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px; background: var(--panel-bg-alt); max-height: 280px;
-  }
-  #matrix-canvas { cursor: ns-resize; display: block; }
-  .matrix-legend { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 10px; color: var(--text-dim); flex-wrap: wrap; }
-  .matrix-tooltip {
-    position: fixed; pointer-events: none; background: #10151d; border: 1px solid var(--accent);
-    color: var(--text); font-family: var(--mono); font-size: 11px; padding: 4px 8px;
-    border-radius: 4px; opacity: 0; transition: opacity .1s; z-index: 50;
-  }
-
-  .prime-stats-list { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
-  .prime-stat-row { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; }
-  .prime-stat-row .swatch { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-  .prime-stat-row .prime-label { width: 28px; color: var(--text-dim); }
-  .prime-stat-row .prime-count { color: var(--text); }
-
-  @media (max-width: 900px) {
-    .app { flex-direction: column; }
-    .panel { flex: 1 1 auto; width: 100%; max-height: 55vh; }
-    .sim-pane { flex: 1 1 45vh; }
-  }
+:root{--bg:#fff;--fg:#000}
+[data-theme=dark]{--bg:#000;--fg:#fff}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif}
+canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0}
+main{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column}
+#hero{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;align-items:center}
+#hero p{margin:0 0 1.6vh;font-size:clamp(15px,1.7vw,24px);letter-spacing:.2em;text-transform:uppercase}
+#name{margin:0;display:flex;gap:.32em;font-family:Helvetica,Arial,sans-serif;font-size:min(10vw,14vh);font-weight:400;line-height:1;letter-spacing:.04em}
+#name button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;line-height:1;cursor:pointer;display:inline-flex;flex-direction:column;align-items:center}
+#name button::before{content:attr(data-ch);font-weight:700;height:0;overflow:hidden;visibility:hidden}
+#name button[aria-pressed=true]{font-weight:700}
+#name button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+#about{max-width:640px;margin:1vh auto 3vh;padding:0 20px;text-align:center;font-size:clamp(14px,1.2vw,18px);line-height:1.45}
+#about p{margin:0}
+#boxes{width:min(1000px,88vw);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:2vh 24px}
+.box{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;height:14.5vh;min-height:88px;padding:10px 16px;box-sizing:border-box;border:1px solid var(--fg);background:var(--bg);color:var(--fg);text-decoration:none;transition:transform .12s,box-shadow .12s}
+.box img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s}
+.box:hover img,.box:focus-visible img{opacity:1}
+.box b,.box span{position:relative;align-self:flex-start;background:var(--bg);padding:2px 6px}
+.box b{font-size:18px;letter-spacing:.08em;text-transform:uppercase}
+.box span{font-size:14px;line-height:1.3;margin-top:6px}
+.box:hover{transform:translate(-3px,-3px);box-shadow:4px 4px 0 var(--fg)}
+.box:active{transform:translate(0,0);box-shadow:1px 1px 0 var(--fg)}
+.box:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+#contact{text-align:center;padding:2.5vh 0;font-size:15px;letter-spacing:.06em}
+#contact a{color:inherit}
+#theme,#helpBtn,#clean{font:12px Helvetica,Arial,sans-serif;padding:4px 8px;border:1px solid var(--fg);background:var(--bg);color:var(--fg);cursor:pointer;border-radius:0}
+#tools{position:fixed;top:16px;right:20px;z-index:10;display:flex;gap:8px;align-items:flex-start}
+html.clean main,html.clean #theme,html.clean #help{display:none}
+#help{position:relative}
+#helpBox{display:none;position:absolute;top:100%;right:0;width:min(380px,80vw);padding:12px 16px;border:1px solid var(--fg);background:var(--bg);color:var(--fg);font-size:14px;line-height:1.45;box-shadow:4px 4px 0 var(--fg)}
+#help:hover #helpBox,#help.open #helpBox{display:block}
+#helpBox p{margin:0 0 8px}
+#helpBox ul{margin:0;padding:0;list-style:none}
+#helpBox li{margin-bottom:3px}
+#err{position:fixed;top:50%;width:100%;text-align:center;display:none}
 </style>
 </head>
 <body>
-  <div class="app">
-    <div class="sim-pane">
-      <canvas id="sim-canvas"></canvas>
-      <div class="hud">
-        <div class="hud-title">FRACTRAN<span class="hud-title-sub">Particle Chemistry Engine</span></div>
-        <div class="hud-readout">
-          <span id="fps-readout">60</span> fps &nbsp;&middot;&nbsp;
-          <span id="particle-readout">0</span> particles &nbsp;&middot;&nbsp;
-          <span id="reaction-readout">0</span> reactions
-        </div>
-      </div>
-      <div class="hud-legend" id="prime-legend"></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <h1>CONTROL DECK</h1>
-        <p>Prime factors as matter. Fractions as chemistry.</p>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Fractran Program</p>
-        <textarea id="program-input" spellcheck="false"></textarea>
-        <div class="btn-row">
-          <button id="apply-program-btn" class="primary">Apply Program</button>
-        </div>
-        <div class="fraction-list" id="fraction-list"></div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Examples</p>
-        <div class="example-grid">
-          <button data-example="simple">Simple Replacement</button>
-          <button data-example="cyclic">Cyclic Network</button>
-          <button data-example="primegame">Conway Primegame</button>
-          <button data-example="chaotic">Chaotic Web</button>
-        </div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Playback</p>
-        <div class="btn-row">
-          <button id="pause-btn">Pause</button>
-          <button id="step-btn">Step</button>
-          <button id="reset-btn">Reset</button>
-        </div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Spawn</p>
-        <div class="btn-row">
-          <button id="randomize-pos-btn">Randomize Positions</button>
-        </div>
-        <div class="spawn-row">
-          <button id="spawn-random-btn">Spawn Random &times;</button>
-          <input type="number" id="spawn-random-count" value="30" min="1" max="200">
-        </div>
-        <div class="spawn-row">
-          <select id="spawn-prime-select"></select>
-          <input type="number" id="custom-prime-input" placeholder="custom">
-          <input type="number" id="spawn-count-input" value="5" min="1" max="100">
-          <button id="spawn-prime-btn">Spawn</button>
-        </div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Physics</p>
-        <div class="field">
-          <label>Reaction Radius <span class="val" id="reaction-radius-val">70</span></label>
-          <input type="range" id="reaction-radius-slider" min="20" max="200" value="70">
-        </div>
-        <div class="field">
-          <label>Simulation Speed <span class="val" id="speed-val">1.0&times;</span></label>
-          <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1">
-        </div>
-        <div class="field">
-          <label>Particle Count <span class="val" id="particle-count-val">220</span></label>
-          <input type="range" id="particle-count-slider" min="20" max="600" value="220">
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="trails-checkbox" checked> <label for="trails-checkbox">Particle trails</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="effects-checkbox" checked> <label for="effects-checkbox">Reaction effects</label>
-        </div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Attraction Matrix</p>
-        <div class="matrix-wrap"><canvas id="matrix-canvas"></canvas></div>
-        <div class="matrix-legend">
-          <span style="color:#ff8b8b">&#9632; repel</span>
-          <span>drag cell vertically &middot; dbl-click to reset</span>
-          <span style="color:#8bffcf">&#9632; attract</span>
-        </div>
-        <div class="btn-row"><button id="randomize-matrix-btn">Randomize Matrix</button></div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">Live Stats</p>
-        <div class="prime-stats-list" id="prime-stats-list"></div>
-      </div>
-    </div>
+<canvas id="c"></canvas>
+<div id="err">This page needs WebGL2 with float render targets.</div>
+<div id="tools">
+<button id="clean" title="Hide everything except the fluid">hide</button>
+<button id="theme">dark</button>
+<div id="help">
+  <button id="helpBtn" aria-label="About this page">?</button>
+  <div id="helpBox" role="dialog">
+    <p>The background is a real-time fluid simulation running on your GPU. Move the mouse to stir it. My name and the boxes are solid obstacles the fluid flows around.</p>
+    <p>Click a letter of my name to toggle an effect (effects stack). Right-click anywhere to turn them all off.</p>
+    <ul id="helpList"></ul>
   </div>
-
-  <div class="matrix-tooltip" id="matrix-tooltip"></div>
-
+</div>
+</div>
+<main>
+<section id="hero">
+  <p>Welcome to the personal website of</p>
+  <h1 id="name" aria-label="Evan Solid"></h1>
+</section>
+<section id="about"><p>Placeholder statement: I build things where math meets graphics: constraint solvers, GPU shaders, physics simulations, and games that run in a browser. Replace this with your own words.</p></section>
+<nav id="boxes">
+  <a class="box" href="media.html"><img src="https://picsum.photos/seed/evan-media/800/500?grayscale" alt="" loading="lazy"><b>Media Reviews</b><span>Rankings and reviews of games, movies, shows, and books.</span></a>
+  <a class="box" href="projects.html"><img src="https://picsum.photos/seed/evan-projects/800/500?grayscale" alt="" loading="lazy"><b>Personal Projects</b><span>Art, Desmos, Project Euler, and other things I've made.</span></a>
+  <a class="box" href="blog.html"><img src="https://picsum.photos/seed/evan-blog/800/500?grayscale" alt="" loading="lazy"><b>Blog</b><span>What I'm interested in and working on.</span></a>
+  <a class="box" href="games.html"><img src="https://picsum.photos/seed/evan-games/800/500?grayscale" alt="" loading="lazy"><b>Games</b><span>Games I've made that you can play in the browser.</span></a>
+</nav>
+<footer id="contact"><a href="mailto:you@example.com">you@example.com</a></footer>
+</main>
 <script>
-'use strict';
+/* =============================================================================
+   CONFIG: every number you might want to tweak lives here.
+   Distances are in "screen heights" (0.1 = 10% of the window height).
+   Velocities are in fluid-grid cells per second.
+   ============================================================================= */
+const CONFIG = {
+  // ---- Solver quality / performance ----
+  simHeight: 320,           // fluid grid rows (columns follow the window shape). More = finer detail, slower.
+  dyeMaxHeight: 1080,       // cap on rows of the dye texture (the visible ink)
+  pressureIterations: 25,   // solver iterations per frame. More = less "squishy" fluid, slower.
+  pressureKeep: 0.8,        // fraction (0..1) of last frame's pressure reused as the starting guess
+  vorticity: 18,            // re-injects small swirls. 0 = smooth and blurry, 40+ = very curly.
 
-/* ================================================================
-   FRACTRAN PARTICLE CHEMISTRY
-   ----------------------------------------------------------------
-   A spatial reinterpretation of Conway's FRACTRAN language.
-   Every prime number is a colored particle type. Every FRACTRAN
-   fraction n/d is a local chemical reaction: whenever particles
-   matching the prime factorization of n drift within range of
-   each other, they may fuse and transform into the prime
-   factorization of d. Particle-Life style physics (attraction /
-   repulsion between type pairs) governs how particles move and,
-   crucially, how likely different reactions are to occur -- the
-   physics IS part of the computation.
+  // ---- Fading ----
+  dyeFadePerSec: 0.25,      // how fast ink vanishes. Higher = fades sooner. 0 = never.
+  velocityFadePerSec: 0.3,  // how fast the fluid slows down by itself (friction)
+  sleepAfterSec: 30,        // the sim stops computing this long after the last input (saves battery)
 
-   This file is organized as a small platform:
-     - Particle        a single moving prime-typed body
-     - SpatialGrid      uniform grid for fast neighbor queries
-     - FractranProgram   parses/holds the fraction rule list
-     - Reaction          an in-progress local reaction + its animation
-     - Simulation         owns particles, physics, reaction search
-     - Renderer            draws the simulation to a canvas
-     - UI                   wires the DOM control panel to the sim
+  // ---- Mouse stirring ----
+  mouse: {
+    force: 1200,            // push strength: fluid speed added per unit of mouse travel
+    splatRadius: 0.035,     // size of the area the cursor disturbs
+    splatSpacingRatio: 0.43,// gap between stamps along a stroke, as a fraction of splatRadius (smaller = smoother)
+    inkPerUnit: 1.5,        // ink darkness per unit of mouse travel (faster mouse = darker wake)
+    inkMax: 0.055,          // cap on ink per stamp. Higher = darker, more visible wake.
+    hueCycles: 4,           // Rainbow only: how quickly hue shifts with mouse speed
+  },
 
-   To extend: new visual effects live in Renderer, new physics
-   rules live in Simulation.applyPhysics, new reaction-matching
-   strategies live in Simulation.tryFireFraction, and new example
-   programs can simply be added to the EXAMPLES table below.
-   ================================================================ */
+  // ---- The swirl kicked up when you click a box ----
+  boxClick: { count: 8, ringRadius: 0.05, spin: 35, ink: 0.07 },
 
-/* ---------------------------------------------------------------
-   Utilities: primes, colors, factorization, program parsing
-   --------------------------------------------------------------- */
-
-const BASE_PRIME_COLORS = {
-  2:  '#ff4d4d', // red
-  3:  '#4d94ff', // blue
-  5:  '#3ddc84', // green
-  7:  '#ffd23d', // yellow
-  11: '#c77dff', // purple
-  13: '#4dd9ec', // cyan
-  17: '#ff9f4d', // orange
-  19: '#ff6fb5', // pink
-  23: '#9fe84d', // lime
-  29: '#4dffc3', // teal
-  31: '#ff5d8f', // rose
-  37: '#a78bfa', // violet
+  // ---- Letter effects ----
+  // Each effect: id (used in code), letter (which letter of EVAN SOLID toggles it), name/desc (shown in the "?" popup)
+  // and params (the tunable numbers). Params of effects that run inside the shaders are passed automatically:
+  // a param named `radius` on effect `vortex` becomes the shader uniform `vortexRadius`.
+  effects: [
+    { id: 'rainbow', letter: 'E', name: 'Effervescence', desc: 'Mouse trails are colored by direction and speed.',
+      params: { saturation: 0.9, value: 0.95, inkBoost: 2.2 } },        // inkBoost: colored ink is made denser so it stays visible
+    { id: 'vortex', letter: 'V', name: 'Vortex', desc: 'Fluid around the cursor spins in a wide whirlpool.',
+      params: { radius: 0.45, speed: 80, pull: 0.08 } },                // radius: reach. speed: spin speed. pull: how quickly the fluid adopts the spin (0..1 per frame)
+    { id: 'attract', letter: 'A', name: 'Attraction', desc: 'Ink is pulled toward the cursor.',
+      params: { radius: 0.17, strength: 55 } },                         // acts on the ink only, because a real fluid cancels pure inward flow
+    { id: 'turbulence', letter: 'N', name: 'Noise', desc: 'A slowly shifting noise field stirs the whole page.',
+      params: { scale: 3, speed: 22, pull: 0.015 } },                   // scale: swirl count across the screen. speed: flow speed. pull: strength (0..1)
+    { id: 'smoke', letter: 'S', name: 'Smoke', desc: 'Ink rises like smoke.',
+      params: { lift: 240 } },                                          // upward push per unit of ink
+    { id: 'ripples', letter: 'O', name: 'Oscillation', desc: 'Rings of alternating spin radiate from the cursor.',
+      params: { radius: 0.245, speed: 5, frequency: 70, strength: 35, pull: 0.08 } }, // frequency: rings per screen height / 2pi. speed: how fast rings travel out
+    { id: 'burst', letter: 'L', name: 'Large', desc: 'Mouse movement pushes the fluid far harder and wider.',
+      params: { forceScale: 6, radiusScale: 2.5, inkScale: 1 } },       // multipliers applied to the mouse settings above
+    { id: 'ink', letter: 'I', name: 'Ink', desc: 'Ink stops fading, so strokes persist.',
+      params: { fade: 0 } },                                            // fade: replaces dyeFadePerSec while on
+    { id: 'drag', letter: 'D', name: 'Drag', desc: 'The fluid turns thick and syrupy.',
+      params: { velocityFade: 6 } },                                    // velocityFade: replaces velocityFadePerSec while on (higher = thicker)
+  ],
 };
 
-const primeColorCache = new Map(Object.entries(BASE_PRIME_COLORS).map(([k, v]) => [Number(k), v]));
-
-function isPrime(n) {
-  n = Math.floor(n);
-  if (n < 2) return false;
-  if (n % 2 === 0) return n === 2;
-  for (let d = 3; d * d <= n; d += 2) if (n % d === 0) return false;
-  return true;
-}
-
-// Assigns (and caches) a glowing color for any prime, even ones
-// outside the hand-picked base palette, via hue rotation.
-function colorForPrime(p) {
-  if (primeColorCache.has(p)) return primeColorCache.get(p);
-  const hue = (p * 47) % 360;
-  const c = `hsl(${hue}, 75%, 60%)`;
-  primeColorCache.set(p, c);
-  return c;
-}
-
-function factorize(n) {
-  const factors = new Map();
-  n = Math.floor(n);
-  if (n <= 1) return factors;
-  let d = 2;
-  while (d * d <= n) {
-    while (n % d === 0) {
-      factors.set(d, (factors.get(d) || 0) + 1);
-      n /= d;
-    }
-    d++;
-  }
-  if (n > 1) factors.set(n, (factors.get(n) || 0) + 1);
-  return factors;
-}
-
-function parseProgramText(text) {
-  const lines = text.split('\n');
-  const fractions = [];
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const m = line.match(/^(\d+)\s*\/\s*(\d+)$/);
-    if (!m) continue;
-    const num = parseInt(m[1], 10), den = parseInt(m[2], 10);
-    if (num <= 0 || den <= 0) continue;
-    const numFactors = factorize(num);
-    const denFactors = factorize(den);
-    let numCount = 0; for (const c of numFactors.values()) numCount += c;
-    let denCount = 0; for (const c of denFactors.values()) denCount += c;
-    fractions.push({
-      text: `${num}/${den}`,
-      num, den,
-      numFactors, denFactors, numCount, denCount,
-      fireCount: 0,
-    });
-  }
-  return fractions;
-}
-
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-/* ---------------------------------------------------------------
-   FractranProgram: parses and holds the current rule list
-   --------------------------------------------------------------- */
-
-class FractranProgram {
-  constructor(text) { this.setText(text || ''); }
-  setText(text) {
-    this.sourceText = text;
-    this.fractions = parseProgramText(text);
-  }
-  resetCounts() { this.fractions.forEach(f => { f.fireCount = 0; }); }
-}
-
-/* ---------------------------------------------------------------
-   Particle: a single moving, prime-typed body
-   --------------------------------------------------------------- */
-
-let particleIdCounter = 1;
-
-class Particle {
-  constructor(prime, x, y, vx = 0, vy = 0) {
-    this.id = particleIdCounter++;
-    this.prime = prime;
-    this.x = x; this.y = y;
-    this.vx = vx; this.vy = vy;
-    this.radius = 3.5 + Math.min(5, Math.log2(prime));
-    this.locked = false; // true while participating in an active Reaction
-  }
-}
-
-/* ---------------------------------------------------------------
-   SpatialGrid: uniform grid for cheap neighbor queries
-   --------------------------------------------------------------- */
-
-class SpatialGrid {
-  constructor(cellSize, width, height) {
-    this.cellSize = Math.max(8, cellSize);
-    this.width = width; this.height = height;
-    this.cells = new Map();
-  }
-  key(cx, cy) { return cx * 100000 + cy; }
-  insert(p) {
-    const cx = Math.floor(p.x / this.cellSize);
-    const cy = Math.floor(p.y / this.cellSize);
-    const k = this.key(cx, cy);
-    let arr = this.cells.get(k);
-    if (!arr) { arr = []; this.cells.set(k, arr); }
-    arr.push(p);
-  }
-  queryNear(x, y, radiusCells) {
-    const cx = Math.floor(x / this.cellSize), cy = Math.floor(y / this.cellSize);
-    const out = [];
-    for (let dx = -radiusCells; dx <= radiusCells; dx++) {
-      for (let dy = -radiusCells; dy <= radiusCells; dy++) {
-        const arr = this.cells.get(this.key(cx + dx, cy + dy));
-        if (arr) for (const p of arr) out.push(p);
-      }
-    }
-    return out;
-  }
-}
-
-/* ---------------------------------------------------------------
-   Reaction: an in-progress local reaction and its animation
-   --------------------------------------------------------------- */
-
-const PHASE_CONVERGE = 'converge';
-const PHASE_PAUSE = 'pause';
-const PHASE_FLASH = 'flash';
-const PHASE_DONE = 'done';
-
-class Reaction {
-  constructor(participants, productPrimes, fraction) {
-    this.participants = participants;       // array of Particle (reactants, now locked)
-    this.productPrimes = productPrimes;      // array of primes to spawn on completion
-    this.fraction = fraction;
-    this.phase = PHASE_CONVERGE;
-    this.t = 0;
-    this.convergeDur = 0.32;
-    this.pauseDur = 0.12;
-    this.flashDur = 0.28;
-
-    let cx = 0, cy = 0, avx = 0, avy = 0;
-    for (const p of participants) { cx += p.x; cy += p.y; avx += p.vx; avy += p.vy; }
-    const n = participants.length;
-    this.cx = cx / n; this.cy = cy / n;
-    this.avgVx = avx / n; this.avgVy = avy / n;
-    this.startPositions = participants.map(p => ({ x: p.x, y: p.y }));
-  }
-
-  update(dt) {
-    this.t += dt;
-    if (this.phase === PHASE_CONVERGE) {
-      const k = clamp(this.t / this.convergeDur, 0, 1);
-      const ease = 1 - Math.pow(1 - k, 3); // ease-out cubic: fast start, gentle arrival
-      this.participants.forEach((p, i) => {
-        const sp = this.startPositions[i];
-        p.x = sp.x + (this.cx - sp.x) * ease;
-        p.y = sp.y + (this.cy - sp.y) * ease;
-        p.vx *= 0.92; p.vy *= 0.92;
-      });
-      if (k >= 1) { this.phase = PHASE_PAUSE; this.t = 0; }
-    } else if (this.phase === PHASE_PAUSE) {
-      if (this.t >= this.pauseDur) { this.phase = PHASE_FLASH; this.t = 0; }
-    } else if (this.phase === PHASE_FLASH) {
-      if (this.t >= this.flashDur) { this.phase = PHASE_DONE; }
-    }
-  }
-
-  isDone() { return this.phase === PHASE_DONE; }
-}
-
-/* ---------------------------------------------------------------
-   Simulation: particles, physics, and reaction search
-   --------------------------------------------------------------- */
-
-class Simulation {
-  constructor(width, height) {
-    this.width = width; this.height = height;
-    this.particles = [];
-    this.reactions = [];
-    this.program = new FractranProgram('');
-    this.attraction = new Map();  // "p|q" -> value in [-1, 1] (force p feels toward q)
-    this.primesSeen = [];         // ordered list of discovered primes
-    this.settings = {
-      reactionRadius: 70,
-      speed: 1,
-      trails: true,
-      effects: true,
-      paused: false,
-      forceStrength: 1400,
-      friction: 1.4,
-      particleCap: 560,
-    };
-    this.stats = { totalReactions: 0 };
-    this.PHYSICS_MAX_R = 140; // fixed particle-life interaction radius
-    this.grid = new SpatialGrid(this.PHYSICS_MAX_R, width, height);
-    this.onPrimesChanged = null; // UI hook
-    this.onReactionFired = null; // UI hook
-  }
-
-  resize(w, h) { this.width = w; this.height = h; }
-
-  aKey(p, q) { return p + '|' + q; }
-
-  ensurePrime(p) {
-    if (this.primesSeen.includes(p)) return;
-    this.primesSeen.push(p);
-    this.primesSeen.sort((a, b) => a - b);
-    for (const q of this.primesSeen) {
-      if (!this.attraction.has(this.aKey(p, q))) this.attraction.set(this.aKey(p, q), Math.random() * 2 - 1);
-      if (!this.attraction.has(this.aKey(q, p))) this.attraction.set(this.aKey(q, p), Math.random() * 2 - 1);
-    }
-    colorForPrime(p);
-    if (this.onPrimesChanged) this.onPrimesChanged();
-  }
-
-  getAttraction(p, q) {
-    const k = this.aKey(p, q);
-    if (!this.attraction.has(k)) this.attraction.set(k, Math.random() * 2 - 1);
-    return this.attraction.get(k);
-  }
-  setAttraction(p, q, v) { this.attraction.set(this.aKey(p, q), clamp(v, -1, 1)); }
-
-  randomizeAttraction() {
-    for (const k of this.attraction.keys()) this.attraction.set(k, Math.random() * 2 - 1);
-  }
-
-  addParticle(prime, x, y, vx, vy) {
-    this.ensurePrime(prime);
-    const p = new Particle(prime, x, y, vx || 0, vy || 0);
-    this.particles.push(p);
-    return p;
-  }
-
-  removeParticle(p) {
-    const idx = this.particles.indexOf(p);
-    if (idx >= 0) this.particles.splice(idx, 1);
-  }
-
-  spawnRandom(prime, count) {
-    for (let i = 0; i < count; i++) {
-      const x = Math.random() * this.width, y = Math.random() * this.height;
-      const ang = Math.random() * Math.PI * 2, spd = Math.random() * 20;
-      this.addParticle(prime, x, y, Math.cos(ang) * spd, Math.sin(ang) * spd);
-    }
-  }
-
-  spawnRandomMix(primes, count) {
-    if (!primes.length) return;
-    for (let i = 0; i < count; i++) {
-      const prime = primes[Math.floor(Math.random() * primes.length)];
-      const x = Math.random() * this.width, y = Math.random() * this.height;
-      const ang = Math.random() * Math.PI * 2, spd = Math.random() * 20;
-      this.addParticle(prime, x, y, Math.cos(ang) * spd, Math.sin(ang) * spd);
-    }
-  }
-
-  randomizePositions() {
-    for (const p of this.particles) {
-      p.x = Math.random() * this.width;
-      p.y = Math.random() * this.height;
-      const ang = Math.random() * Math.PI * 2, spd = Math.random() * 20;
-      p.vx = Math.cos(ang) * spd; p.vy = Math.sin(ang) * spd;
-    }
-  }
-
-  setProgram(text) {
-    this.program.setText(text);
-    for (const f of this.program.fractions) {
-      for (const p of f.numFactors.keys()) this.ensurePrime(p);
-      for (const p of f.denFactors.keys()) this.ensurePrime(p);
-    }
-  }
-
-  clearParticles() { this.particles = []; this.reactions = []; }
-
-  // -------------------- physics --------------------
-
-  rebuildGrid() {
-    // Cell size is tied to the fixed physics interaction radius (not the
-    // user-adjustable reaction radius) so the neighbor scan below always
-    // covers exactly a 3x3 block of cells -- the sweet spot for a uniform
-    // grid where cell size roughly equals the query radius.
-    const cellSize = this.PHYSICS_MAX_R;
-    this.grid = new SpatialGrid(cellSize, this.width, this.height);
-    for (const p of this.particles) this.grid.insert(p);
-  }
-
-  // Classic "particle life" force curve: strong short-range repulsion
-  // (soft collision) that transitions into an attraction/repulsion
-  // lobe shaped by the attraction matrix, fading to zero at maxR.
-  // Neighbor cells are scanned inline (no intermediate array) since
-  // this runs for every unlocked particle, every frame.
-  applyPhysics(dt) {
-    const maxR = this.PHYSICS_MAX_R;
-    const beta = 0.3;
-    const cellSize = this.grid.cellSize;
-    const radiusCells = Math.ceil(maxR / cellSize);
-    const cells = this.grid.cells;
-    const forceStrength = this.settings.forceStrength;
-    const damp = Math.max(0, 1 - this.settings.friction * dt);
-    const maxSpeed = 220;
-
-    for (const p of this.particles) {
-      if (p.locked) continue;
-      const cx = Math.floor(p.x / cellSize), cy = Math.floor(p.y / cellSize);
-      let fx = 0, fy = 0;
-      for (let gx = -radiusCells; gx <= radiusCells; gx++) {
-        for (let gy = -radiusCells; gy <= radiusCells; gy++) {
-          const arr = cells.get(this.grid.key(cx + gx, cy + gy));
-          if (!arr) continue;
-          for (let k = 0; k < arr.length; k++) {
-            const q = arr[k];
-            if (q === p) continue;
-            const dx = q.x - p.x, dy = q.y - p.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
-            if (dist > maxR) continue;
-            const r = dist / maxR;
-            const a = this.getAttraction(p.prime, q.prime);
-            let f;
-            if (r < beta) f = r / beta - 1;
-            else if (r < 1) f = a * (1 - Math.abs(2 * r - 1 - beta) / (1 - beta));
-            else f = 0;
-            fx += (dx / dist) * f;
-            fy += (dy / dist) * f;
-          }
-        }
-      }
-      p.vx = (p.vx + fx * forceStrength * dt) * damp;
-      p.vy = (p.vy + fy * forceStrength * dt) * damp;
-
-      const sp = Math.hypot(p.vx, p.vy);
-      if (sp > maxSpeed) { p.vx = p.vx / sp * maxSpeed; p.vy = p.vy / sp * maxSpeed; }
-    }
-
-    for (const p of this.particles) {
-      if (p.locked) continue;
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      const m = p.radius;
-      if (p.x < m) { p.x = m; p.vx = Math.abs(p.vx) * 0.5; }
-      else if (p.x > this.width - m) { p.x = this.width - m; p.vx = -Math.abs(p.vx) * 0.5; }
-      if (p.y < m) { p.y = m; p.vy = Math.abs(p.vy) * 0.5; }
-      else if (p.y > this.height - m) { p.y = this.height - m; p.vy = -Math.abs(p.vy) * 0.5; }
-    }
-  }
-
-  // -------------------- reactions --------------------
-
-  attemptReactions() {
-    if (this.program.fractions.length === 0) return;
-    let budget = clamp(Math.floor(this.particles.length / 4), 15, 90);
-    while (budget-- > 0) {
-      let matched = false;
-      // Re-scan from the top of the program every pass so earlier
-      // fractions always keep first priority, exactly like FRACTRAN.
-      for (const fraction of this.program.fractions) {
-        if (this.tryFireFraction(fraction)) { matched = true; break; }
-      }
-      if (!matched) break;
-    }
-  }
-
-  tryFireFraction(fraction) {
-    const req = fraction.numFactors;
-
-    // Any reaction that grows the total particle count is bounded by
-    // the particle cap, so runaway-growth programs (like the prime
-    // generator) plateau instead of firing forever.
-    const netChange = fraction.denCount - fraction.numCount;
-    if (netChange > 0 && this.particles.length + netChange > this.settings.particleCap) return false;
-
-    // Numerator of 1: nothing is required, so in real FRACTRAN this
-    // step always applies. Spatially we treat it as a rare "generator"
-    // event so it doesn't dominate every pass.
-    if (req.size === 0) {
-      if (Math.random() > 0.05) return false;
-      this.fireReaction([], fraction);
-      return true;
-    }
-
-    const reqPrimes = [...req.keys()];
-    const R = this.settings.reactionRadius;
-    const radiusCells = Math.max(1, Math.ceil(R / this.grid.cellSize));
-    const seedTries = 6;
-
-    for (let t = 0; t < seedTries; t++) {
-      const seedPrime = reqPrimes[Math.floor(Math.random() * reqPrimes.length)];
-      const pool = this.particles.filter(p => !p.locked && p.prime === seedPrime);
-      if (pool.length === 0) continue;
-      const seed = pool[Math.floor(Math.random() * pool.length)];
-
-      const nearby = this.grid.queryNear(seed.x, seed.y, radiusCells)
-        .filter(p => !p.locked && p !== seed && Math.hypot(p.x - seed.x, p.y - seed.y) <= R);
-      nearby.sort((a, b) => Math.hypot(a.x - seed.x, a.y - seed.y) - Math.hypot(b.x - seed.x, b.y - seed.y));
-
-      const remaining = new Map(req);
-      const selected = [seed];
-      const seedLeft = remaining.get(seed.prime) - 1;
-      if (seedLeft <= 0) remaining.delete(seed.prime); else remaining.set(seed.prime, seedLeft);
-
-      for (const cand of nearby) {
-        if (remaining.size === 0) break;
-        const need = remaining.get(cand.prime);
-        if (need && need > 0) {
-          selected.push(cand);
-          if (need - 1 <= 0) remaining.delete(cand.prime); else remaining.set(cand.prime, need - 1);
-        }
-      }
-
-      if (remaining.size === 0) {
-        this.fireReaction(selected, fraction);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  fireReaction(participants, fraction) {
-    const products = [];
-    for (const [prime, count] of fraction.denFactors) {
-      for (let i = 0; i < count; i++) products.push(prime);
-    }
-
-    if (participants.length === 0) {
-      // Generator fraction (numerator 1): products appear from nothing.
-      const x = Math.random() * this.width, y = Math.random() * this.height;
-      for (const prime of products) {
-        const ang = Math.random() * Math.PI * 2;
-        this.addParticle(prime, x, y, Math.cos(ang) * 15, Math.sin(ang) * 15);
-      }
-    } else {
-      participants.forEach(p => { p.locked = true; });
-      this.reactions.push(new Reaction(participants, products, fraction));
-    }
-
-    fraction.fireCount++;
-    this.stats.totalReactions++;
-    if (this.onReactionFired) this.onReactionFired(fraction);
-  }
-
-  updateReactions(dt) {
-    for (let i = this.reactions.length - 1; i >= 0; i--) {
-      const r = this.reactions[i];
-      r.update(dt);
-      if (r.isDone()) {
-        for (const p of r.participants) this.removeParticle(p);
-        for (const prime of r.productPrimes) {
-          const ang = Math.random() * Math.PI * 2;
-          const impulse = 25 + Math.random() * 35;
-          const vx = r.avgVx * 0.6 + Math.cos(ang) * impulse;
-          const vy = r.avgVy * 0.6 + Math.sin(ang) * impulse;
-          const jitter = 6;
-          this.addParticle(prime, r.cx + (Math.random() - 0.5) * jitter, r.cy + (Math.random() - 0.5) * jitter, vx, vy);
-        }
-        this.reactions.splice(i, 1);
-      }
-    }
-  }
-
-  // -------------------- main step --------------------
-
-  update(dt) {
-    dt = Math.min(dt, 0.05);
-    this.rebuildGrid();
-    this.applyPhysics(dt);
-    this.updateReactions(dt);
-    this.attemptReactions();
-  }
-
-  // Advances a fixed slice of simulated time regardless of the
-  // paused flag -- used by the "Step" control.
-  stepOnce() {
-    const fixedDt = 1 / 60;
-    for (let i = 0; i < 60; i++) this.update(fixedDt * this.settings.speed);
-  }
-}
-
-/* ---------------------------------------------------------------
-   Renderer: draws the simulation to the canvas
-   --------------------------------------------------------------- */
-
-class Renderer {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.bgCanvas = document.createElement('canvas');
-    this.bgReady = false;
-  }
-
-  resize(w, h) {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.canvas.width = Math.round(w * dpr);
-    this.canvas.height = Math.round(h * dpr);
-    this.canvas.style.width = w + 'px';
-    this.canvas.style.height = h + 'px';
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.w = w; this.h = h;
-    this.buildBackground();
-  }
-
-  buildBackground() {
-    const bg = this.bgCanvas;
-    bg.width = Math.max(1, this.w); bg.height = Math.max(1, this.h);
-    const bctx = bg.getContext('2d');
-    bctx.clearRect(0, 0, bg.width, bg.height);
-    bctx.strokeStyle = 'rgba(125,211,252,0.045)';
-    bctx.lineWidth = 1;
-    const step = 48;
-    for (let x = 0; x < bg.width; x += step) { bctx.beginPath(); bctx.moveTo(x + 0.5, 0); bctx.lineTo(x + 0.5, bg.height); bctx.stroke(); }
-    for (let y = 0; y < bg.height; y += step) { bctx.beginPath(); bctx.moveTo(0, y + 0.5); bctx.lineTo(bg.width, y + 0.5); bctx.stroke(); }
-    this.bgReady = true;
-  }
-
-  render(sim) {
-    const ctx = this.ctx;
-    ctx.fillStyle = sim.settings.trails ? 'rgba(5,7,11,0.16)' : '#05070b';
-    ctx.fillRect(0, 0, this.w, this.h);
-    if (this.bgReady) ctx.drawImage(this.bgCanvas, 0, 0, this.w, this.h);
-
-    if (sim.settings.effects) {
-      for (const r of sim.reactions) {
-        if (r.phase === PHASE_CONVERGE || r.phase === PHASE_PAUSE) {
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          const g = ctx.createRadialGradient(r.cx, r.cy, 0, r.cx, r.cy, 26);
-          g.addColorStop(0, 'rgba(255,255,255,0.22)');
-          g.addColorStop(1, 'rgba(255,255,255,0)');
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(r.cx, r.cy, 26, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
-        }
-      }
-    }
-
-    for (const p of sim.particles) {
-      const color = colorForPrime(p.prime);
-      ctx.save();
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = color;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    if (sim.settings.effects) {
-      for (const r of sim.reactions) {
-        if (r.phase === PHASE_FLASH) {
-          const k = r.t / r.flashDur;
-          const radius = 8 + k * 46;
-          const alpha = 1 - k;
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-          ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.arc(r.cx, r.cy, radius, 0, Math.PI * 2); ctx.stroke();
-          ctx.restore();
-        }
-      }
-    }
-  }
-}
-
-/* ---------------------------------------------------------------
-   Example FRACTRAN programs
-   --------------------------------------------------------------- */
-
-const EXAMPLES = {
-  simple: '6/10',
-  cyclic: '6/10\n10/15\n15/6',
-  primegame: '17/91\n78/85\n19/51\n23/38\n29/33\n77/29\n95/23\n77/19\n1/17\n11/13\n13/11\n15/14\n15/2\n55/1',
-  chaotic: '6/10\n10/14\n14/6\n15/21\n21/33\n33/15\n35/26\n26/35\n4/9\n9/25\n25/4\n2/13\n13/2',
+/* ---------------------------- effect bookkeeping ---------------------------- */
+const EFFECTS = CONFIG.effects;
+const FX = new Float32Array(EFFECTS.length);          // FX[i] is 1 while effect i is on
+const idx = {}, LETTER = {};                          // id -> index, letter -> index
+EFFECTS.forEach((e, i) => { idx[e.id] = i; LETTER[e.letter] = i; });
+const on = id => FX[idx[id]] > 0;                     // is this effect on?
+const fxp = id => EFFECTS[idx[id]].params;            // that effect's params
+// Effects that keep changing the fluid by themselves (so the sim must keep running while they are on)
+const CONTINUOUS = ['vortex', 'attract', 'turbulence', 'smoke', 'ripples'];
+const active = () => CONTINUOUS.some(on);
+// Pack an effect's params into shader uniforms: fxUniforms('vortex','vortex') -> {vortexOn:1, vortexRadius:..., ...}
+const fxUniforms = (id, prefix) => {
+  const u = {[prefix + 'On']: +on(id)};
+  for (const k in fxp(id)) u[prefix + k[0].toUpperCase() + k.slice(1)] = fxp(id)[k];
+  return u;
 };
 
-/* ---------------------------------------------------------------
-   Matrix cell coloring: diverging scale, red = repel, teal = attract
-   --------------------------------------------------------------- */
+/* ---------------------------------- setup ---------------------------------- */
+const $ = id => document.getElementById(id);
+const canvas = $('c');
+const gl = canvas.getContext('webgl2', {alpha: false, antialias: false});
+if (!gl || !gl.getExtension('EXT_color_buffer_float')) { $('err').style.display = 'block'; throw new Error('no webgl2'); }
 
-function valueToColor(v) {
-  v = clamp(v, -1, 1);
-  if (v >= 0) {
-    const r = Math.round(28 + v * 20), g = Math.round(38 + v * 190), b = Math.round(58 + v * 130);
-    return `rgb(${r},${g},${b})`;
-  } else {
-    const t = -v;
-    const r = Math.round(58 + t * 190), g = Math.round(38 + t * 20), b = Math.round(48 + t * 40);
-    return `rgb(${r},${g},${b})`;
-  }
+let dark = false;                                     // page starts in light mode
+let mouse = [-9, -9], prev = null;                    // cursor position (0..1 coords, y up) and the previous position
+let idleUntil = 0, last = performance.now();          // when the sim may go to sleep; last frame time
+let simW, simH, dyeW, dyeH, aspect;                   // grid sizes and window aspect ratio
+let vel, dye, pr, divT, curlT, obs;                   // textures: velocity, ink, pressure, divergence, curl, obstacle mask
+
+/* ---------------------------------- shaders ---------------------------------- */
+// Vertex shader: one full-screen triangle; also computes the four neighbor coordinates (L/R/T/B)
+const VS = `#version 300 es
+precision highp float;
+uniform vec2 texel; out vec2 vUv,vL,vR,vT,vB;
+void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); vUv=p;
+vL=p-vec2(texel.x,0.);vR=p+vec2(texel.x,0.);vT=p+vec2(0.,texel.y);vB=p-vec2(0.,texel.y);
+gl_Position=vec4(p*2.-1.,0.,1.);}`;
+// Shared fragment header. solid(uv) is 1 inside an obstacle (letters, boxes) or outside the screen, else 0.
+const HEAD = `#version 300 es
+precision highp float; precision highp sampler2D;
+in vec2 vUv,vL,vR,vT,vB; uniform vec2 texel; uniform sampler2D uObs; out vec4 o;
+float solid(vec2 u){ if(u.x<0.||u.x>1.||u.y<0.||u.y>1.) return 1.; return step(.5,texture(uObs,u).r); }
+`;
+const vsH = sh(gl.VERTEX_SHADER, VS);
+function sh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s), src); return s; }
+function mk(fs){ const p = gl.createProgram(); gl.attachShader(p, vsH); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, HEAD + fs));
+  gl.linkProgram(p); const loc = {}; return {p, u: n => n in loc ? loc[n] : (loc[n] = gl.getUniformLocation(p, n))}; }
+
+const P = {
+  // Adds a Gaussian blob of `color` at `point`. Used for both velocity (pushes) and dye (ink). `radius` is squared distance scale.
+  splat: mk(`uniform sampler2D uTarget; uniform float aspect,radius; uniform vec2 point; uniform vec4 color;
+void main(){ vec2 p=vUv-point; p.x*=aspect; vec4 r=texture(uTarget,vUv)+color*exp(-dot(p,p)/radius); r/=max(1.,r.a); o=solid(vUv)>.5?vec4(0):r; }`),
+
+  // Moves a field (velocity or ink) along the velocity field. Attract effect also drags ink toward the cursor here.
+  advect: mk(`uniform sampler2D uVel,uSrc; uniform vec2 mouse; uniform float dt,diss,aspect;
+uniform float attractOn,attractRadius,attractStrength;
+void main(){ vec2 v=texture(uVel,vUv).xy;
+ vec2 p=vUv-mouse; p.x*=aspect; float r=length(p);
+ v-=attractOn*p/(r+1e-3)*exp(-r*r/(attractRadius*attractRadius))*attractStrength;
+ o=solid(vUv)>.5?vec4(0):texture(uSrc,vUv-dt*v*texel)*diss; }`),
+
+  // Applies the per-frame forces of the letter effects to the velocity field. Each block is one effect.
+  fx: mk(`uniform sampler2D uVel,uDye; uniform vec2 mouse; uniform float t,dt,aspect;
+uniform float vortexOn,vortexRadius,vortexSpeed,vortexPull;
+uniform float rippleOn,rippleRadius,rippleSpeed,rippleFrequency,rippleStrength,ripplePull;
+uniform float noiseOn,noiseScale,noiseSpeed,noisePull;
+uniform float smokeOn,smokeLift;
+void main(){ vec2 v=texture(uVel,vUv).xy;
+ vec2 p=vUv-mouse; p.x*=aspect; float r=length(p); vec2 tg=vec2(-p.y,p.x)/(r+1e-4);   // tg = direction of spin around the cursor
+ // Vortex: pull the fluid toward a steady spin around the cursor, fading out with distance
+ v=mix(v,tg*vortexSpeed,vortexOn*exp(-r*r/(vortexRadius*vortexRadius))*vortexPull);
+ // Ripples: spin whose direction alternates with distance, drifting outward over time
+ v=mix(v,tg*sin(r*rippleFrequency-t*rippleSpeed)*rippleStrength,rippleOn*exp(-r*r/(rippleRadius*rippleRadius))*ripplePull);
+ // Turbulence: a slowly changing wavy flow pattern over the whole screen
+ vec2 q=vUv*vec2(aspect,1.)*noiseScale;
+ vec2 f=vec2(sin(q.y*1.7+t*.4)+sin(q.x*2.3-t*.3+q.y),cos(q.x*1.9-t*.5)+cos(q.y*2.1+t*.35-q.x));
+ v=mix(v,f*noiseSpeed,noiseOn*noisePull);
+ // Smoke: ink pushes itself upward (denser ink rises more)
+ v.y+=smokeOn*texture(uDye,vUv).a*dt*smokeLift;
+ o=solid(vUv)>.5?vec4(0):vec4(v,0.,1.); }`),
+
+  // The next five passes are the standard "stable fluids" steps: curl, vorticity confinement, divergence, pressure solve, projection.
+  curl: mk(`uniform sampler2D uVel;
+void main(){ float L=texture(uVel,vL).y,R=texture(uVel,vR).y,T=texture(uVel,vT).x,B=texture(uVel,vB).x; o=vec4(.5*(R-L-T+B),0.,0.,1.); }`),
+  vort: mk(`uniform sampler2D uVel,uCurl; uniform float curl,dt;
+void main(){ float L=texture(uCurl,vL).x,R=texture(uCurl,vR).x,T=texture(uCurl,vT).x,B=texture(uCurl,vB).x,C=texture(uCurl,vUv).x;
+ vec2 f=.5*vec2(abs(T)-abs(B),abs(R)-abs(L)); f/=length(f)+1e-4; f*=curl*C; f.y*=-1.;
+ vec2 v=clamp(texture(uVel,vUv).xy+f*dt,-1000.,1000.); o=vec4(v,0.,1.); }`),
+  div: mk(`uniform sampler2D uVel;
+void main(){ vec2 C=texture(uVel,vUv).xy; float L=texture(uVel,vL).x,R=texture(uVel,vR).x,T=texture(uVel,vT).y,B=texture(uVel,vB).y;
+ if(solid(vL)>.5)L=-C.x; if(solid(vR)>.5)R=-C.x; if(solid(vT)>.5)T=-C.y; if(solid(vB)>.5)B=-C.y;
+ o=vec4(.5*(R-L+T-B),0.,0.,1.); }`),
+  scale: mk(`uniform sampler2D uTex; uniform float value; void main(){ o=value*texture(uTex,vUv); }`),
+  press: mk(`uniform sampler2D uPressure,uDiv;
+void main(){ float C=texture(uPressure,vUv).x;
+ float L=solid(vL)>.5?C:texture(uPressure,vL).x, R=solid(vR)>.5?C:texture(uPressure,vR).x;
+ float T=solid(vT)>.5?C:texture(uPressure,vT).x, B=solid(vB)>.5?C:texture(uPressure,vB).x;
+ o=vec4((L+R+B+T-texture(uDiv,vUv).x)*.25,0.,0.,1.); }`),
+  grad: mk(`uniform sampler2D uPressure,uVel;
+void main(){ float C=texture(uPressure,vUv).x;
+ float L=solid(vL)>.5?C:texture(uPressure,vL).x, R=solid(vR)>.5?C:texture(uPressure,vR).x;
+ float T=solid(vT)>.5?C:texture(uPressure,vT).x, B=solid(vB)>.5?C:texture(uPressure,vB).x;
+ vec2 v=texture(uVel,vUv).xy-vec2(R-L,T-B); o=solid(vUv)>.5?vec4(0):vec4(v,0.,1.); }`),
+
+  // Final image. The sim always draws ink on white; dark mode inverts it (and rotates hue back so rainbow colors stay true).
+  disp: mk(`uniform sampler2D uDye; uniform float inv;
+void main(){ vec4 d=texture(uDye,vUv); float a=min(d.a,1.); vec3 c=d.rgb+vec3(1.)*(1.-a);
+ if(inv>.5){ c=1.-c; c=mat3(-.574,.426,.426,1.43,.43,1.43,.144,.144,-.856)*c; }
+ c+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/255.; o=vec4(c,1.); }`)
+};
+
+/* ------------------------------ textures / drawing ------------------------------ */
+// Make a float texture + framebuffer. Double buffers (mkD) let a pass read one copy while writing the other.
+function mkT(w, h){ const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  for (const k of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, k, gl.LINEAR);
+  for (const k of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, k, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT); return {t, f, w, h}; }
+function mkD(w, h){ let a = mkT(w,h), b = mkT(w,h); return {get r(){return a}, get w(){return b}, swap(){[a,b]=[b,a]}}; }
+
+// Run one shader pass. `u` maps uniform names to numbers, [x,y] / [x,y,z,w] arrays, or textures ({t:...}); `tg` is the target (null = screen).
+function run(prog, u, tg){
+  gl.useProgram(prog.p);
+  u = {uObs: obs, texel: [1/simW, 1/simH], ...u};
+  let k = 0;
+  for (const n in u){ const v = u[n], l = prog.u(n);
+    if (v && v.t){ gl.activeTexture(gl.TEXTURE0 + k); gl.bindTexture(gl.TEXTURE_2D, v.t); gl.uniform1i(l, k++); }
+    else if (typeof v === 'number') gl.uniform1f(l, v);
+    else if (v.length === 2) gl.uniform2fv(l, v);
+    else if (v.length === 4) gl.uniform4fv(l, v); }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tg ? tg.f : null);
+  gl.viewport(0, 0, tg ? tg.w : canvas.width, tg ? tg.h : canvas.height);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
-/* ---------------------------------------------------------------
-   UI: wires the DOM control panel to the Simulation
-   --------------------------------------------------------------- */
-
-class UI {
-  constructor(sim) {
-    this.sim = sim;
-    this.matrixDirty = true;
-    this.matrixMeta = null;
-    this.statsAccum = 0;
-    this.cacheDom();
-    this.bindEvents();
-    sim.onPrimesChanged = () => { this.matrixDirty = true; this.rebuildSpawnOptions(); };
-  }
-
-  cacheDom() {
-    const $ = id => document.getElementById(id);
-    this.dom = {
-      fpsReadout: $('fps-readout'),
-      particleReadout: $('particle-readout'),
-      reactionReadout: $('reaction-readout'),
-      primeLegend: $('prime-legend'),
-      programInput: $('program-input'),
-      applyProgramBtn: $('apply-program-btn'),
-      fractionList: $('fraction-list'),
-      pauseBtn: $('pause-btn'),
-      stepBtn: $('step-btn'),
-      resetBtn: $('reset-btn'),
-      randomizePosBtn: $('randomize-pos-btn'),
-      spawnRandomBtn: $('spawn-random-btn'),
-      spawnRandomCount: $('spawn-random-count'),
-      spawnPrimeSelect: $('spawn-prime-select'),
-      customPrimeInput: $('custom-prime-input'),
-      spawnCountInput: $('spawn-count-input'),
-      spawnPrimeBtn: $('spawn-prime-btn'),
-      reactionRadiusSlider: $('reaction-radius-slider'),
-      reactionRadiusVal: $('reaction-radius-val'),
-      speedSlider: $('speed-slider'),
-      speedVal: $('speed-val'),
-      particleCountSlider: $('particle-count-slider'),
-      particleCountVal: $('particle-count-val'),
-      trailsCheckbox: $('trails-checkbox'),
-      effectsCheckbox: $('effects-checkbox'),
-      matrixCanvas: $('matrix-canvas'),
-      randomizeMatrixBtn: $('randomize-matrix-btn'),
-      primeStatsList: $('prime-stats-list'),
-      matrixTooltip: $('matrix-tooltip'),
-    };
-  }
-
-  bindEvents() {
-    const d = this.dom, sim = this.sim;
-
-    document.querySelectorAll('[data-example]').forEach(btn => {
-      btn.addEventListener('click', () => this.loadExample(btn.dataset.example));
-    });
-
-    d.applyProgramBtn.addEventListener('click', () => {
-      sim.setProgram(d.programInput.value);
-      this.renderFractionList();
-      this.matrixDirty = true;
-    });
-
-    d.pauseBtn.addEventListener('click', () => {
-      sim.settings.paused = !sim.settings.paused;
-      d.pauseBtn.textContent = sim.settings.paused ? 'Resume' : 'Pause';
-    });
-
-    d.stepBtn.addEventListener('click', () => {
-      sim.settings.paused = true;
-      d.pauseBtn.textContent = 'Resume';
-      sim.stepOnce();
-    });
-
-    d.resetBtn.addEventListener('click', () => this.resetSimulation());
-
-    d.randomizePosBtn.addEventListener('click', () => sim.randomizePositions());
-
-    d.spawnRandomBtn.addEventListener('click', () => {
-      const n = clamp(parseInt(d.spawnRandomCount.value, 10) || 30, 1, 400);
-      const primes = sim.primesSeen.length ? sim.primesSeen : [2, 3, 5, 7];
-      sim.spawnRandomMix(primes, n);
-    });
-
-    d.spawnPrimeBtn.addEventListener('click', () => {
-      let prime = parseInt(d.customPrimeInput.value, 10);
-      if (!prime || !isPrime(prime)) prime = parseInt(d.spawnPrimeSelect.value, 10) || 2;
-      const count = clamp(parseInt(d.spawnCountInput.value, 10) || 5, 1, 200);
-      sim.spawnRandom(prime, count);
-      d.customPrimeInput.value = '';
-    });
-
-    d.reactionRadiusSlider.addEventListener('input', () => {
-      sim.settings.reactionRadius = +d.reactionRadiusSlider.value;
-      d.reactionRadiusVal.textContent = d.reactionRadiusSlider.value;
-    });
-
-    d.speedSlider.addEventListener('input', () => {
-      sim.settings.speed = +d.speedSlider.value;
-      d.speedVal.textContent = (+d.speedSlider.value).toFixed(1) + '\u00d7';
-    });
-
-    d.particleCountSlider.addEventListener('input', () => {
-      const v = +d.particleCountSlider.value;
-      d.particleCountVal.textContent = v;
-      this.adjustParticleCount(v);
-    });
-
-    d.trailsCheckbox.addEventListener('change', () => { sim.settings.trails = d.trailsCheckbox.checked; });
-    d.effectsCheckbox.addEventListener('change', () => { sim.settings.effects = d.effectsCheckbox.checked; });
-
-    d.randomizeMatrixBtn.addEventListener('click', () => { sim.randomizeAttraction(); this.matrixDirty = true; });
-
-    this.setupMatrixInteraction();
-  }
-
-  adjustParticleCount(target) {
-    const sim = this.sim;
-    const current = sim.particles.length;
-    if (target > current) {
-      const primes = sim.primesSeen.length ? sim.primesSeen : [2, 3, 5, 7];
-      sim.spawnRandomMix(primes, target - current);
-    } else if (target < current) {
-      const unlocked = sim.particles.filter(p => !p.locked);
-      let toRemove = current - target;
-      while (toRemove-- > 0 && unlocked.length > 0) {
-        const idx = Math.floor(Math.random() * unlocked.length);
-        sim.removeParticle(unlocked[idx]);
-        unlocked.splice(idx, 1);
-      }
-    }
-  }
-
-  resetSimulation() {
-    const sim = this.sim;
-    sim.clearParticles();
-    sim.program.resetCounts();
-    sim.stats.totalReactions = 0;
-    const primes = sim.primesSeen.length ? sim.primesSeen : [2, 3, 5];
-    sim.spawnRandomMix(primes, parseInt(this.dom.particleCountSlider.value, 10) || 200);
-    this.renderFractionList();
-  }
-
-  loadExample(key) {
-    const programText = EXAMPLES[key];
-    if (!programText) return;
-    const sim = this.sim;
-    this.dom.programInput.value = programText;
-    sim.clearParticles();
-    sim.attraction.clear();
-    sim.primesSeen = [];
-    sim.setProgram(programText);
-    sim.program.resetCounts();
-    sim.stats.totalReactions = 0;
-
-    const primes = sim.primesSeen.length ? sim.primesSeen : [2, 3, 5];
-    const count = parseInt(this.dom.particleCountSlider.value, 10) || 220;
-
-    if (key === 'primegame') {
-      // The classical program starts execution from the single number 2;
-      // seed heavily with 2s plus a scattering of everything else so the
-      // reaction chain has fuel to run with right away.
-      sim.spawnRandom(2, Math.max(20, Math.floor(count * 0.45)));
-      sim.spawnRandomMix(primes, Math.floor(count * 0.55));
-    } else {
-      sim.spawnRandomMix(primes, count);
-    }
-
-    this.renderFractionList();
-    this.matrixDirty = true;
-  }
-
-  renderFractionList() {
-    const el = this.dom.fractionList;
-    el.innerHTML = '';
-    this.sim.program.fractions.forEach((f, idx) => {
-      const row = document.createElement('div');
-      row.className = 'fraction-row';
-      const idxSpan = document.createElement('span');
-      idxSpan.className = 'fraction-idx'; idxSpan.textContent = idx + 1;
-      const textSpan = document.createElement('span');
-      textSpan.className = 'fraction-text'; textSpan.textContent = f.text;
-      const countSpan = document.createElement('span');
-      countSpan.className = 'fraction-count'; countSpan.dataset.idx = idx; countSpan.textContent = f.fireCount;
-      row.append(idxSpan, textSpan, countSpan);
-      el.appendChild(row);
-    });
-  }
-
-  rebuildSpawnOptions() {
-    const sel = this.dom.spawnPrimeSelect;
-    const current = sel.value;
-    sel.innerHTML = '';
-    this.sim.primesSeen.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p; opt.textContent = p;
-      sel.appendChild(opt);
-    });
-    if (current && this.sim.primesSeen.includes(+current)) sel.value = current;
-  }
-
-  renderPrimeStats() {
-    const counts = new Map();
-    for (const p of this.sim.particles) counts.set(p.prime, (counts.get(p.prime) || 0) + 1);
-    const el = this.dom.primeStatsList;
-    el.innerHTML = '';
-    [...counts.keys()].sort((a, b) => a - b).forEach(prime => {
-      const row = document.createElement('div');
-      row.className = 'prime-stat-row';
-      row.innerHTML = `<span class="swatch" style="background:${colorForPrime(prime)}"></span>` +
-                       `<span class="prime-label">${prime}</span>` +
-                       `<span class="prime-count">${counts.get(prime)}</span>`;
-      el.appendChild(row);
-    });
-  }
-
-  renderPrimeLegend() {
-    const counts = new Map();
-    for (const p of this.sim.particles) counts.set(p.prime, (counts.get(p.prime) || 0) + 1);
-    const el = this.dom.primeLegend;
-    el.innerHTML = '';
-    [...counts.keys()].sort((a, b) => a - b).slice(0, 12).forEach(prime => {
-      const chip = document.createElement('div');
-      chip.className = 'legend-chip';
-      const c = colorForPrime(prime);
-      chip.innerHTML = `<span class="dot" style="background:${c};box-shadow:0 0 6px ${c}"></span>${prime}`;
-      el.appendChild(chip);
-    });
-  }
-
-  drawMatrix() {
-    const primes = this.sim.primesSeen;
-    const n = primes.length;
-    const canvas = this.dom.matrixCanvas;
-    if (n === 0) { canvas.width = 1; canvas.height = 1; this.matrixDirty = false; return; }
-
-    const labelSize = 20;
-    const cell = clamp(Math.floor(240 / n), 16, 30);
-    const size = labelSize + cell * n;
-    canvas.width = size; canvas.height = size;
-    canvas.style.width = size + 'px'; canvas.style.height = size + 'px';
-
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, size, size);
-
-    for (let i = 0; i < n; i++) {
-      const c = colorForPrime(primes[i]);
-      ctx.fillStyle = c;
-      ctx.fillRect(labelSize + i * cell + cell / 2 - 3, 4, 6, 6);
-      ctx.fillRect(4, labelSize + i * cell + cell / 2 - 3, 6, 6);
-    }
-
-    for (let i = 0; i < n; i++) {       // row i = source prime (the particle feeling the force)
-      for (let j = 0; j < n; j++) {     // col j = target prime (the particle being felt)
-        const v = this.sim.getAttraction(primes[i], primes[j]);
-        ctx.fillStyle = valueToColor(v);
-        ctx.fillRect(labelSize + j * cell + 1, labelSize + i * cell + 1, cell - 2, cell - 2);
-      }
-    }
-
-    this.matrixMeta = { primes, cell, labelSize, size };
-    this.matrixDirty = false;
-  }
-
-  cellFromEvent(e) {
-    if (!this.matrixMeta) return null;
-    const rect = this.dom.matrixCanvas.getBoundingClientRect();
-    if (rect.width === 0) return null;
-    const scaleX = this.dom.matrixCanvas.width / rect.width;
-    const scaleY = this.dom.matrixCanvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX, y = (e.clientY - rect.top) * scaleY;
-    const { labelSize, cell, primes } = this.matrixMeta;
-    if (x < labelSize || y < labelSize) return null;
-    const j = Math.floor((x - labelSize) / cell), i = Math.floor((y - labelSize) / cell);
-    if (i < 0 || i >= primes.length || j < 0 || j >= primes.length) return null;
-    return { i, j };
-  }
-
-  updateMatrixTooltip(cell, e) {
-    const tt = this.dom.matrixTooltip;
-    if (!cell) { tt.style.opacity = 0; return; }
-    const primes = this.matrixMeta.primes;
-    const v = this.sim.getAttraction(primes[cell.i], primes[cell.j]);
-    tt.textContent = `${primes[cell.i]} \u2192 ${primes[cell.j]}: ${v.toFixed(2)}`;
-    tt.style.opacity = 1;
-    tt.style.left = (e.clientX + 14) + 'px';
-    tt.style.top = (e.clientY + 14) + 'px';
-  }
-
-  setupMatrixInteraction() {
-    const canvas = this.dom.matrixCanvas;
-    let dragging = null;
-
-    canvas.addEventListener('mousedown', e => {
-      const cell = this.cellFromEvent(e);
-      if (!cell) return;
-      const primes = this.matrixMeta.primes;
-      dragging = { ...cell, startY: e.clientY, startVal: this.sim.getAttraction(primes[cell.i], primes[cell.j]) };
-    });
-
-    window.addEventListener('mousemove', e => {
-      if (!dragging) {
-        if (e.target === canvas) this.updateMatrixTooltip(this.cellFromEvent(e), e);
-        else this.dom.matrixTooltip.style.opacity = 0;
-        return;
-      }
-      const dy = dragging.startY - e.clientY;
-      const nv = clamp(dragging.startVal + dy / 100, -1, 1);
-      const primes = this.matrixMeta.primes;
-      this.sim.setAttraction(primes[dragging.i], primes[dragging.j], nv);
-      this.matrixDirty = true;
-    });
-
-    window.addEventListener('mouseup', () => { dragging = null; });
-
-    canvas.addEventListener('dblclick', e => {
-      const cell = this.cellFromEvent(e);
-      if (!cell) return;
-      const primes = this.matrixMeta.primes;
-      this.sim.setAttraction(primes[cell.i], primes[cell.j], 0);
-      this.matrixDirty = true;
-    });
-
-    canvas.addEventListener('mouseleave', () => { this.dom.matrixTooltip.style.opacity = 0; });
-  }
-
-  tick(sim, fps) {
-    this.dom.fpsReadout.textContent = fps;
-    this.dom.particleReadout.textContent = sim.particles.length;
-    this.dom.reactionReadout.textContent = sim.stats.totalReactions;
-
-    const counts = this.dom.fractionList.querySelectorAll('.fraction-count');
-    counts.forEach(c => {
-      const i = +c.dataset.idx;
-      const f = sim.program.fractions[i];
-      if (f) c.textContent = f.fireCount;
-    });
-
-    this.statsAccum++;
-    if (this.statsAccum % 12 === 0) {
-      this.renderPrimeStats();
-      this.renderPrimeLegend();
-    }
-    if (this.matrixDirty) this.drawMatrix();
-  }
+/* ---------------------- name letters and obstacle mask ---------------------- */
+const mc = document.createElement('canvas');          // 2D canvas used to draw the obstacle mask
+const letters = [];                                   // the letter buttons
+function buildName(){
+  const h = $('name');
+  'EVAN SOLID'.split(' ').forEach(w => { const s = document.createElement('span');
+    for (const ch of w){ const b = document.createElement('button'); const i = LETTER[ch];
+      b.textContent = ch; b.dataset.ch = ch; b.title = EFFECTS[i].name; b.setAttribute('aria-pressed', 'false');
+      b.onclick = () => {                             // toggle this letter's effect: bold + random color when on, default when off
+        FX[i] = FX[i] ? 0 : 1; b.setAttribute('aria-pressed', FX[i] ? 'true' : 'false');
+        b.style.color = FX[i] ? `hsl(${Math.random()*360|0} 85% 45%)` : '';
+        buildMask(); wake(); };                       // rebuild mask because bold glyphs are a different shape
+      s.appendChild(b); letters.push(b); }
+    s.style.display = 'flex'; h.appendChild(s); });
+}
+// Draw the letters and boxes in white on black at fluid-grid resolution, upload as the obstacle texture
+function buildMask(){
+  mc.width = simW; mc.height = simH; const x = mc.getContext('2d');
+  x.setTransform(1,0,0,1,0,0); x.fillStyle = '#000'; x.fillRect(0, 0, simW, simH);
+  x.setTransform(simW/innerWidth, 0, 0, simH/innerHeight, 0, 0); x.fillStyle = '#fff'; x.textBaseline = 'alphabetic';
+  document.querySelectorAll('.box').forEach(b => { const r = b.getBoundingClientRect(); x.fillRect(r.left, r.top, r.width, r.height); });
+  letters.forEach(b => { if (!b.offsetParent) return;   // skip letters while hidden
+    const r = b.getBoundingClientRect(), cs = getComputedStyle(b), fs = parseFloat(cs.fontSize);
+    x.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; const m = x.measureText(b.textContent);
+    const A = m.fontBoundingBoxAscent ?? fs*.9, D = m.fontBoundingBoxDescent ?? fs*.2, ls = fs*.04;
+    x.fillText(b.textContent, r.left + (r.width - m.width - ls)/2, r.top + (r.height - (A + D))/2 + A); });
+  gl.bindTexture(gl.TEXTURE_2D, obs.t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, mc); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+}
+// (Re)create every texture for the current window size. Called at load and after resizing (which resets the fluid).
+function init(){
+  aspect = innerWidth / innerHeight; simH = CONFIG.simHeight; simW = Math.round(simH * aspect);
+  dyeH = Math.min(CONFIG.dyeMaxHeight, Math.round(innerHeight * Math.min(devicePixelRatio, 1.5))); dyeW = Math.round(dyeH * aspect);
+  canvas.width = dyeW; canvas.height = dyeH;
+  vel = mkD(simW, simH); dye = mkD(dyeW, dyeH); pr = mkD(simW, simH); divT = mkT(simW, simH); curlT = mkT(simW, simH);
+  if (!obs){ const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    for (const k of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, k, gl.LINEAR);
+    for (const k of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, k, gl.CLAMP_TO_EDGE); obs = {t}; }
+  buildMask(); wake();
 }
 
-/* ---------------------------------------------------------------
-   Bootstrap
-   --------------------------------------------------------------- */
+/* ------------------------------- mouse and ink ------------------------------- */
+const hsv = (h,s,v) => { const f = n => { const k = (n + h*6) % 6; return v - v*s*Math.max(0, Math.min(k, 4-k, 1)); }; return [f(5), f(3), f(1)]; };
+// Ink color as premultiplied [r,g,b,a]. Plain ink is black (alpha only); Rainbow tints it by hue h.
+function inkColor(d, h){
+  if (on('rainbow')){ const R = fxp('rainbow'); d *= R.inkBoost; const c = hsv(h, R.saturation, R.value); return [c[0]*d, c[1]*d, c[2]*d, d]; }
+  return [0, 0, 0, d];
+}
+// Stamp a push (vx,vy) and ink color c at (x,y), with the given radius in screen heights
+function splat(x, y, vx, vy, c, radius = CONFIG.mouse.splatRadius){
+  run(P.splat, {uTarget: vel.r, aspect, radius: radius*radius, point: [x,y], color: [vx, vy, 0, 0]}, vel.w); vel.swap();
+  run(P.splat, {uTarget: dye.r, aspect, radius: radius*radius, point: [x,y], color: c}, dye.w); dye.swap();
+}
+// Stamp a smooth line of splats from mouse position a to b. Burst scales force/size/ink.
+function stroke(a, b){
+  const M = CONFIG.mouse, B = on('burst') ? fxp('burst') : {forceScale: 1, radiusScale: 1, inkScale: 1};
+  const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx * aspect, dy); if (dist < 1e-4) return;
+  const radius = M.splatRadius * B.radiusScale, n = Math.max(1, Math.ceil(dist / (radius * M.splatSpacingRatio)));
+  const ink = Math.min(dist * M.inkPerUnit, M.inkMax) * B.inkScale, force = M.force * B.forceScale;
+  const hue = ((Math.atan2(dy, dx) / 6.2832 + 1) + dist * M.hueCycles) % 1, c = inkColor(ink, hue);
+  for (let i = 0; i < n; i++){ const f = (i + .5) / n; splat(a.x + dx*f, a.y + dy*f, dx*aspect*force, dy*force, c, radius); }
+}
+function wake(){ idleUntil = performance.now() + CONFIG.sleepAfterSec * 1000; }   // keep the sim running for a while
+addEventListener('pointermove', e => { const p = {x: e.clientX/innerWidth, y: 1 - e.clientY/innerHeight};
+  if (prev) stroke(prev, p); prev = p; mouse = [p.x, p.y]; wake(); });
+document.documentElement.addEventListener('pointerleave', () => { prev = null; mouse = [-9, -9]; });
+// Clicking a box kicks up a small ring of spinning ink just above it
+document.querySelectorAll('.box').forEach(b => b.addEventListener('pointerdown', e => {
+  if (e.button) return;
+  const C = CONFIG.boxClick, r = b.getBoundingClientRect(), cx = e.clientX/innerWidth, cy = 1 - (r.top - 18)/innerHeight, h = Math.random();
+  for (let i = 0; i < C.count; i++){ const a = i / C.count * 6.2832;
+    splat(cx + Math.cos(a)*C.ringRadius/aspect, cy + Math.sin(a)*C.ringRadius, -Math.sin(a)*C.spin, Math.cos(a)*C.spin, inkColor(C.ink, (h + i/C.count) % 1)); }
+  wake(); }));
+// Right-click anywhere: turn every effect off and reset the letters
+addEventListener('contextmenu', e => { e.preventDefault(); FX.fill(0);
+  letters.forEach(b => { b.setAttribute('aria-pressed', 'false'); b.style.color = ''; }); buildMask(); wake(); });
 
-window.addEventListener('DOMContentLoaded', () => {
-  const canvas = document.getElementById('sim-canvas');
-  const simPane = document.querySelector('.sim-pane');
-  const rect = simPane.getBoundingClientRect();
+/* --------------------------- theme toggle and "?" popup --------------------------- */
+const themeBtn = $('theme');
+function applyTheme(){ document.documentElement.dataset.theme = dark ? 'dark' : 'light'; themeBtn.textContent = dark ? 'light' : 'dark'; }
+themeBtn.onclick = () => { dark = !dark; applyTheme(); drawDisp(); wake(); };
+// Hide/show everything except the fluid (the mask is rebuilt so no invisible obstacles remain)
+$('clean').onclick = () => { const c = document.documentElement.classList.toggle('clean'); $('clean').textContent = c ? 'show' : 'hide'; buildMask(); wake(); };
+$('helpList').innerHTML = EFFECTS.map(e => `<li><b>${e.letter}</b> ${e.name}: ${e.desc}</li>`).join('');   // popup list comes from CONFIG
+$('helpBtn').onclick = e => { e.stopPropagation(); $('help').classList.toggle('open'); };
+document.addEventListener('click', e => { if (!$('help').contains(e.target)) $('help').classList.remove('open'); });
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(init, 150); });
+document.fonts.ready.then(buildMask);
 
-  const sim = new Simulation(rect.width, rect.height);
-  const renderer = new Renderer(canvas);
-  renderer.resize(rect.width, rect.height);
-
-  const ui = new UI(sim);
-  ui.loadExample('cyclic');
-
-  window.addEventListener('resize', () => {
-    const r = simPane.getBoundingClientRect();
-    sim.resize(r.width, r.height);
-    renderer.resize(r.width, r.height);
-  });
-
-  let lastTs = performance.now();
-  let fps = 60, fpsAccum = 0, fpsTs = lastTs;
-
-  function frame(ts) {
-    let dt = (ts - lastTs) / 1000;
-    lastTs = ts;
-    dt = Math.min(dt, 0.05);
-
-    fpsAccum++;
-    if (ts - fpsTs > 500) {
-      fps = Math.round(fpsAccum / ((ts - fpsTs) / 1000));
-      fpsAccum = 0; fpsTs = ts;
-    }
-
-    if (!sim.settings.paused) sim.update(dt * sim.settings.speed);
-    renderer.render(sim);
-    ui.tick(sim, fps);
-
-    requestAnimationFrame(frame);
-  }
+/* ------------------------------- simulation loop ------------------------------- */
+function drawDisp(){ run(P.disp, {uDye: dye.r, inv: dark ? 1 : 0}, null); }
+function step(dt, t){
+  // 1. letter-effect forces
+  run(P.fx, {uVel: vel.r, uDye: dye.r, mouse, t, dt, aspect,
+    ...fxUniforms('vortex','vortex'), ...fxUniforms('ripples','ripple'), ...fxUniforms('turbulence','noise'),
+    ...fxUniforms('smoke','smoke')}, vel.w); vel.swap();
+  // 2. vorticity confinement
+  run(P.curl, {uVel: vel.r}, curlT);
+  run(P.vort, {uVel: vel.r, uCurl: curlT, curl: CONFIG.vorticity, dt}, vel.w); vel.swap();
+  // 3. make the flow incompressible: measure divergence, solve for pressure, subtract its gradient
+  run(P.div, {uVel: vel.r}, divT);
+  run(P.scale, {uTex: pr.r, value: CONFIG.pressureKeep}, pr.w); pr.swap();
+  for (let i = 0; i < CONFIG.pressureIterations; i++){ run(P.press, {uPressure: pr.r, uDiv: divT}, pr.w); pr.swap(); }
+  run(P.grad, {uPressure: pr.r, uVel: vel.r}, vel.w); vel.swap();
+  // 4. move velocity and ink along the flow, fading both a little (Ink effect replaces the ink fade rate)
+  const dyeFade = on('ink') ? fxp('ink').fade : CONFIG.dyeFadePerSec;
+  run(P.advect, {uVel: vel.r, uSrc: vel.r, dt, diss: 1/(1 + (on('drag') ? fxp('drag').velocityFade : CONFIG.velocityFadePerSec)*dt)}, vel.w); vel.swap();
+  run(P.advect, {uVel: vel.r, uSrc: dye.r, dt, diss: 1/(1 + dyeFade*dt), mouse, aspect, ...fxUniforms('attract','attract')}, dye.w); dye.swap();
+  // 5. draw
+  drawDisp();
+}
+function frame(now){
   requestAnimationFrame(frame);
-});
+  const dt = Math.min((now - last)/1000, .033); last = now;
+  if (active() || now < idleUntil) step(dt, now/1000);   // sleep when nothing is happening
+}
+buildName(); applyTheme(); init(); drawDisp();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
