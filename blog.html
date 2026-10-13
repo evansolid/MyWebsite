@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blog | Evan Solid</title>
+<link rel="stylesheet" href="site.css">
+<style>
+.post-link{display:block;padding:14px 0;border-bottom:1px solid #000;color:#000;text-decoration:none}
+.post-link:hover b{text-decoration:underline}
+.post-link b{font-size:22px}
+.date{font-size:14px;letter-spacing:.08em;text-transform:uppercase;opacity:.65}
+.post{max-width:680px;font-size:18px;line-height:1.65}
+.post h1{text-transform:none;letter-spacing:0;font-size:clamp(30px,4vw,44px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="back" href="index.html">&larr; Home</a>
+<div id="view"></div>
+</div>
+<script>
+// To publish a post: add an entry at the TOP of this list (newest first).
+//   id    - short unique slug used in the link (blog.html#my-post)
+//   date  - any text, e.g. '2026-10-12'
+//   body  - HTML: <p>paragraphs</p>, <h3>headings</h3>, <img src="...">, links, etc. Wrap in backticks to span lines.
+const POSTS = [
+  {id: 'second-post', title: 'A second placeholder post', date: '2026-10-13',
+   body: `<p>Replace this with what you are working on.</p><p>Posts can contain <a href="media.html">links</a>, images, and anything else HTML allows.</p>`},
+  {id: 'first-post', title: 'A first placeholder post', date: '2026-10-12',
+   body: `<p>Replace this with your first entry.</p>`},
+];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function show() {
+  const p = POSTS.find(x => x.id === location.hash.slice(1));
+  document.getElementById('view').innerHTML = p
+    ? `<div class="post"><h1>${esc(p.title)}</h1><div class="date">${esc(p.date)}</div>${p.body}<p><a href="#">&larr; All posts</a></p></div>`
+    : `<h1>Blog</h1><p class="lead">What I'm interested in, building, and thinking about.</p>` +
+      POSTS.map(x => `<a class="post-link" href="#${esc(x.id)}"><b>${esc(x.title)}</b><div class="date">${esc(x.date)}</div></a>`).join('');
+  window.scrollTo(0, 0);
+}
+addEventListener('hashchange', show);
+show();
+</script>
+</body>
+</html>
