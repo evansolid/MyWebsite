@@ -187,7 +187,7 @@ function hostCheck() {
 
 function holderWins(prefix) {
   G.phase = 'over'; G.winner = 'holder';
-  G.msg = prefix + '😈 ' + G.names[G.holder] + ' had the bomb and wins!';
+  G.msg = prefix + G.names[G.holder] + ' had the bomb and wins!';
 }
 
 function resolve() {
@@ -206,7 +206,7 @@ function resolve() {
 
   if (executed && executed === G.holder) {
     G.phase = 'over'; G.winner = 'survivors';
-    G.msg = msg + '💥 They had the bomb. It explodes, and everyone still alive wins!';
+    G.msg = msg + 'They had the bomb. It explodes, and everyone still alive wins!';
   } else {
     // bomb moves to the chosen player, unless that player was just executed
     if (G.alive.includes(G.pass)) G.holder = G.pass;
@@ -248,9 +248,11 @@ function render() {
   $('close').hidden = host !== me;
   const add = (tag, text) => { const d = document.createElement(tag); d.textContent = text; el.appendChild(d); return d; };
   const nm = id => (pub && pub.names[id]) || '?';
+  const myName = (players.find(p => p.id === me) || {}).name || '';
+  add('p', 'Playing as: ' + myName).style.fontWeight = 'bold';
 
   if (!pub) {
-    add('p', 'In the room: ' + players.map(p => p.name + (p.online ? '' : ' (offline)')).join(', '));
+    add('p', 'In the room: ' + players.map(p => p.name + (p.id === me ? ' (you)' : '') + (p.online ? '' : ' (offline)')).join(', '));
     if (host === me) add('button', 'Start game (3+ players)').onclick = startGame;
     else add('p', 'Waiting for the host to start...');
     return;
@@ -265,10 +267,10 @@ function render() {
 
   add('h3', 'Round ' + pub.round);
   if (pub.msg) add('div', pub.msg).id = 'banner';
-  add('p', 'Alive: ' + pub.alive.map(nm).join(', '));
+  add('p', 'Alive: ' + pub.alive.map(id => nm(id) + (id === me ? ' (you)' : '')).join(', '));
   if (!pub.alive.includes(me)) { add('p', 'You are out. Spectating.'); return; }
 
-  add('p', role.bomb ? '💣 YOU HAVE THE BOMB' : 'You do not have the bomb (for now).');
+  add('p', role.bomb ? 'YOU HAVE THE BOMB' : 'You do not have the bomb.');
   if (pub.done.includes(me)) {
     add('p', 'Locked in. Waiting for: ' + pub.alive.filter(id => !pub.done.includes(id)).map(nm).join(', '));
     return;
@@ -282,8 +284,14 @@ function render() {
   };
 }
 
-$('create').onclick = () => connect({ t: 'create', game: 'bomb', name: $('name').value });
-$('join').onclick = () => connect({ t: 'join', code: $('code').value, name: $('name').value });
+$('name').value = localStorage.getItem('playerName') || '';
+const nameValue = () => {
+  const n = $('name').value.trim() || 'Player';
+  localStorage.setItem('playerName', n);
+  return n;
+};
+$('create').onclick = () => connect({ t: 'create', game: 'bomb', name: nameValue() });
+$('join').onclick = () => connect({ t: 'join', code: $('code').value, name: nameValue() });
 $('leave').onclick = () => { send({ t: 'leave' }); if (ws) ws.close(); endSession(); };
 $('close').onclick = () => { if (confirm('Close the room for everyone?')) send({ t: 'close' }); };
 
