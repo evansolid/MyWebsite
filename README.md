@@ -1,3 +1,3 @@
 This is my website!
 
-Website link: https://evansolid.github.io/MyWebsite/
+Website link: https://evansolid.com
