@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Projects | Evan Solid</title>
+<link rel="stylesheet" href="site.css">
+<style>
+h1{margin:16px 0 4px}
+h2{margin:26px 0 12px}
+.feat{display:grid;grid-template-columns:240px 1fr;border:1px solid #000;margin-bottom:14px;color:#000;text-decoration:none;transition:transform .12s,box-shadow .12s}
+a.feat:hover{transform:translate(-3px,-3px);box-shadow:4px 4px 0 #000}
+.feat .img{min-height:150px;border-right:1px solid #000;background:repeating-linear-gradient(45deg,#eee,#eee 8px,#fff 8px,#fff 16px)}
+.feat .img img{width:100%;height:100%;object-fit:cover;display:block}
+.feat .body{padding:14px 18px;display:flex;flex-direction:column;justify-content:center}
+.feat h3{margin:0 0 6px;font-size:20px;letter-spacing:.04em;text-transform:uppercase}
+.feat p{margin:0 0 6px;font-size:15px}
+.tech{font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.65}
+.grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.card h3{font-size:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="back" href="index.html">&larr; Home</a>
+<h1>Personal Projects</h1>
+<p class="lead">The things I'm proudest of first, and more as you scroll.</p>
+<h2>Featured</h2>
+<div id="featured"></div>
+<h2>More</h2>
+<div id="more" class="grid"></div>
+</div>
+<script>
+// To edit: change these entries. featured:true shows as a large window; the rest go in the grid below.
+// href is the page or link the project opens (leave '' for no link); img is an optional image path.
+const P = (title, desc, tech, featured, href = '', img = '') => ({title, desc, tech, featured, href, img});
+const PROJECTS = [
+  P('Featured project 1', 'Description of the project and why you are proud of it.', 'Technologies used', true),
+  P('Featured project 2', 'Description of the project and why you are proud of it.', 'Technologies used', true),
+  P('Featured project 3', 'Description of the project and why you are proud of it.', 'Technologies used', true),
+  P('Desmos work', 'Short description.', 'Desmos', false),
+  P('Project Euler', 'Short description.', 'Math, code', false),
+  P('Art', 'Short description.', 'Medium', false),
+  P('Project four', 'Short description.', 'Technologies', false),
+  P('Project five', 'Short description.', 'Technologies', false),
+  P('Project six', 'Short description.', 'Technologies', false),
+];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pic = p => esc(p.img || `https://picsum.photos/seed/${encodeURIComponent(p.title)}/900/600?grayscale`);
+const wrap = (p, cls, inner) => p.href ? `<a class="${cls}" href="${esc(p.href)}">${inner}</a>` : `<div class="${cls}">${inner}</div>`;
+document.getElementById('featured').innerHTML = PROJECTS.filter(p => p.featured).map(p =>
+  wrap(p, 'feat', `<div class="img"><img src="${pic(p)}" alt=""></div><div class="body"><h3>${esc(p.title)}</h3><p>${esc(p.desc)}</p><div class="tech">${esc(p.tech)}</div></div>`)).join('');
+document.getElementById('more').innerHTML = PROJECTS.filter(p => !p.featured).map(p =>
+  wrap(p, 'card', `<div class="img"><img src="${pic(p)}" alt=""></div><div class="body"><h3>${esc(p.title)}</h3><p>${esc(p.desc)}</p><div class="tech">${esc(p.tech)}</div></div>`)).join('');
+</script>
+</body>
+</html>
