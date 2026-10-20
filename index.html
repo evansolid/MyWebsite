@@ -52,8 +52,8 @@ html.clean main,html.clean #theme,html.clean #help{display:none}
 <div id="help">
   <button id="helpBtn" aria-label="About this page">?</button>
   <div id="helpBox" role="dialog">
-    <p>The background is a real-time fluid simulation running on your GPU. Move the mouse to stir it. My name and the boxes are solid obstacles the fluid flows around.</p>
-    <p>Click a letter of my name to toggle an effect (effects stack). Right-click anywhere to turn them all off.</p>
+    <p>The background of this page is a real-time fluid simulation running on your GPU. Move the mouse to stir it! The letters and the boxes are solid obstacles that the fluid interacts with.</p>
+    <p>Click a letter to toggle an effect (effects stack). Right-click anywhere to turn them all off.</p>
     <ul id="helpList"></ul>
   </div>
 </div>
@@ -70,7 +70,7 @@ html.clean main,html.clean #theme,html.clean #help{display:none}
   <a class="box" href="blog.html"><img src="https://picsum.photos/seed/evan-blog/800/500?grayscale" alt="" loading="lazy"><b>Blog</b><span>What I'm interested in and working on.</span></a>
   <a class="box" href="games.html"><img src="https://picsum.photos/seed/evan-games/800/500?grayscale" alt="" loading="lazy"><b>Games</b><span>Games I've made that you can play in the browser.</span></a>
 </nav>
-<footer id="contact"><a href="mailto:mrevansolid@gmail.com">mrevansolid@gmail.com</a></footer>
+<footer id="contact">Contact me: <a href="mailto:mrevansolid@gmail.com">mrevansolid@gmail.com</a>   Github: <a href="github.com/evansolid">evansolid</footer>
 </main>
 <script>
 /* =============================================================================
@@ -109,23 +109,23 @@ const CONFIG = {
   // and params (the tunable numbers). Params of effects that run inside the shaders are passed automatically:
   // a param named `radius` on effect `vortex` becomes the shader uniform `vortexRadius`.
   effects: [
-    { id: 'rainbow', letter: 'E', name: 'Effervescence', desc: 'Mouse trails are colored by direction and speed.',
+    { id: 'rainbow', letter: 'E', name: 'Effervescence', desc: 'Fluid trails are colored by direction and speed of the mouse.',
       params: { saturation: 0.9, value: 0.95, inkBoost: 2.2 } },        // inkBoost: colored ink is made denser so it stays visible
-    { id: 'vortex', letter: 'V', name: 'Vortex', desc: 'Fluid around the cursor spins in a wide whirlpool.',
+    { id: 'vortex', letter: 'V', name: 'Vortex', desc: 'Fluid around the cursor spins in a wide swirl.',
       params: { radius: 0.45, speed: 80, pull: 0.08 } },                // radius: reach. speed: spin speed. pull: how quickly the fluid adopts the spin (0..1 per frame)
-    { id: 'attract', letter: 'A', name: 'Attraction', desc: 'Ink is pulled toward the cursor.',
+    { id: 'attract', letter: 'A', name: 'Attraction', desc: 'Fluid is pulled toward the cursor.',
       params: { radius: 0.17, strength: 55 } },                         // acts on the ink only, because a real fluid cancels pure inward flow
     { id: 'turbulence', letter: 'N', name: 'Noise', desc: 'A slowly shifting noise field stirs the whole page.',
       params: { scale: 3, speed: 22, pull: 0.015 } },                   // scale: swirl count across the screen. speed: flow speed. pull: strength (0..1)
-    { id: 'smoke', letter: 'S', name: 'Smoke', desc: 'Ink rises like smoke.',
+    { id: 'smoke', letter: 'S', name: 'Smoke', desc: 'Fluid rises towards the top of the page like smoke.',
       params: { lift: 240 } },                                          // upward push per unit of ink
-    { id: 'ripples', letter: 'O', name: 'Oscillation', desc: 'Rings of alternating spin radiate from the cursor.',
+    { id: 'ripples', letter: 'O', name: 'Oscillation', desc: 'Ripples radiate out from the cursor.',
       params: { radius: 0.245, speed: 5, frequency: 70, strength: 35, pull: 0.08 } }, // frequency: rings per screen height / 2pi. speed: how fast rings travel out
-    { id: 'burst', letter: 'L', name: 'Large', desc: 'Mouse movement pushes the fluid far harder and wider.',
+    { id: 'burst', letter: 'L', name: 'Large', desc: 'Mouse movement pushes the fluid much harder and wider.',
       params: { forceScale: 6, radiusScale: 2.5, inkScale: 1 } },       // multipliers applied to the mouse settings above
-    { id: 'ink', letter: 'I', name: 'Ink', desc: 'Ink stops fading, so strokes persist.',
+    { id: 'ink', letter: 'I', name: 'Ink', desc: 'Fluid stops fading, as if it has turned to ink.',
       params: { fade: 0 } },                                            // fade: replaces dyeFadePerSec while on
-    { id: 'drag', letter: 'D', name: 'Drag', desc: 'The fluid turns thick and syrupy.',
+    { id: 'drag', letter: 'D', name: 'Drag', desc: 'The fluid turns thick and slows its movement.',
       params: { velocityFade: 6 } },                                    // velocityFade: replaces velocityFadePerSec while on (higher = thicker)
   ],
 };
