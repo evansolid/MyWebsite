@@ -25,6 +25,7 @@ h1{font-size:22px;text-align:center}h3{margin:16px 0 4px}
 .n button{padding:1px 6px;font-size:11px}.col{display:flex;flex-direction:column;align-items:center}
 .ctr{pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:36%;line-height:1.25}
 </style></head><body><div id="app"></div>
+
 <script>
 // ===== CONFIG: set this to your Pi's websocket URL =====
 const SERVER = 'wss://ws.evansolid.com', GAME='dice-game';
@@ -251,17 +252,18 @@ function ctl(P,mp,cur){const ph=S.phase,b=S.bet;
 
 try{const s=JSON.parse(sessionStorage.s||'null');if(s){code=s.code;token=s.token;open({t:'rejoin',code,token})}}catch{}
 render();
- <div id="server-status" style="position: fixed; bottom: 0; left: 0;">Checking server...</div>
+</script>
+<div id="server-status" style="position: fixed; bottom: 0; left: 0;">Checking server...</div>
   <script>
     const statusEl = document.getElementById('server-status');
 
     fetch('https://ws.evansolid.com/status')
       .then(r => r.json())
       .then(s => {
-        statusEl.textContent = `🟢 Server: Online · ${s.players} players, ${s.rooms} rooms`;
+        statusEl.textContent = `🟢 Server: Online`;
       })
       .catch(() => {
         statusEl.textContent = '🔴 Server: Offline';
       });
   </script>
-</script></body></html>
+  </body></html>
