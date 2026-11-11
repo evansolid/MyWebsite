@@ -251,4 +251,17 @@ function ctl(P,mp,cur){const ph=S.phase,b=S.bet;
 
 try{const s=JSON.parse(sessionStorage.s||'null');if(s){code=s.code;token=s.token;open({t:'rejoin',code,token})}}catch{}
 render();
+ <div id="server-status" style="position: fixed; bottom: 0; left: 0;">Checking server...</div>
+  <script>
+    const statusEl = document.getElementById('server-status');
+
+    fetch('https://ws.evansolid.com/status')
+      .then(r => r.json())
+      .then(s => {
+        statusEl.textContent = `🟢 Server: Online · ${s.players} players, ${s.rooms} rooms`;
+      })
+      .catch(() => {
+        statusEl.textContent = '🔴 Server: Offline';
+      });
+  </script>
 </script></body></html>
