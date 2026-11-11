@@ -193,9 +193,9 @@ const menu=()=>`<h1>Dice Game</h1>
 <div class=row><input placeholder="Room code" maxlength=4 size=8 value="${esc(ccode)}" oninput="ccode=this.value.toUpperCase()"><button onclick="go({t:'join',code:ccode,name:uname})">Join game</button></div>
 <div class=msg style="color:#dc2626">${esc(err)}</div>
 <div class=rules><h3>How to play</h3>
-<p>Everyone rolls their dice in secret. Players take turns making a bet about how many dice of one face (2 to 6) are on the whole table, for example "four 5s". Ones are wild and count as every face.</p>
-<p>Each bet must be higher than the last: more dice, or the same number of dice with a higher face. Instead of raising, you can call the previous player a liar.</p>
-<p>When Liar is called, everyone reveals their dice. If there are at least as many matching dice as the bet, the caller loses a die. Otherwise the bettor loses one. The loser starts the next round, and the last player with dice wins.</p>
+<p>Everyone's dice are rolled in secret. Players take turns increasing a bet for at least how many dice of one face (2 to 6) are on the whole table among all of the dice, for example "four 5s" means that the player is betting there are at least four dice with a 4 or a 1 among all the dice in play. Ones are wild and count as every face.</p>
+<p>Each bet must be higher than the last, and increase either the number of dice, or the same number of dice with a higher face. Instead of raising the bet, you can call the previous player a liar.</p>
+<p>When Liar is called, everyone has their dice revealed. If there are at least as many matching dice as the bet, the caller loses a die. Otherwise the player that made the bet loses one. The loser starts the next round, and the last player with any dice left in their hand wins.</p>
 <p>Unusual mode adds special dice types with abilities. After Liar is called, players take turns using them before the count.</p></div>`;
 
 function render(){document.body.dataset.theme=cs.theme;const a=$('#app'),H=host===me;
