@@ -1,0 +1,110 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat test</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 2em auto; padding: 0 1em; }
+  #log { border: 1px solid #888; height: 300px; overflow-y: auto; padding: .5em; margin: .5em 0; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: gray; }
+</style>
+
+<h2><span class="dot" id="dot"></span> Chat test</h2>
+
+<div id="lobby">
+  <input id="name" placeholder="Your name" maxlength="16">
+  <button id="create">Create room</button><br><br>
+  <input id="code" placeholder="CODE" maxlength="4" size="6">
+  <button id="join">Join room</button>
+</div>
+
+<div id="room" hidden>
+  <div>Room <b id="roomcode"></b> · ping <span id="ping">–</span> ms · <span id="status"></span></div>
+  <div id="players"></div>
+  <div id="log"></div>
+  <input id="msg" placeholder="Type a message" size="40">
+  <button id="send">Send</button>
+</div>
+
+<script>
+const SERVER = 'wss://ws.evansolid.com';
+const $ = id => document.getElementById(id);
+let ws, session = JSON.parse(localStorage.getItem('session') || 'null');
+let retry = 0, pingTimer, players = [];
+
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+function connect(first) {
+  ws = new WebSocket(SERVER);
+  ws.onopen = () => {
+    retry = 0;
+    $('status').textContent = 'connected';
+    $('dot').style.background = 'limegreen';
+    send(first);
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
+  };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onclose = () => {
+    clearInterval(pingTimer);
+    $('status').textContent = 'disconnected, retrying...';
+    $('dot').style.background = 'red';
+    if (session) {
+      setTimeout(() => connect({ t: 'rejoin', code: session.code, token: session.token }),
+                 Math.min(1000 * 2 ** retry++, 10000));
+    }
+  };
+}
+
+function showRoom(show) {
+  $('lobby').hidden = show;
+  $('room').hidden = !show;
+}
+
+function addLine(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  $('log').appendChild(d);
+  $('log').scrollTop = $('log').scrollHeight;
+}
+
+const nameOf = id => (players.find(p => p.id === id) || {}).name || '?';
+
+function renderPlayers() {
+  $('players').textContent = 'Players: ' +
+    players.map(p => p.name + (p.online ? '' : ' (offline)')).join(', ');
+}
+
+function handle(m) {
+  if (m.t === 'joined') {
+    session = { code: m.code, token: m.token };
+    localStorage.setItem('session', JSON.stringify(session));
+    players = m.players;
+    $('roomcode').textContent = m.code;
+    $('log').textContent = '';
+    m.log.forEach(e => addLine(nameOf(e.from) + ': ' + e.data.chat));
+    renderPlayers();
+    showRoom(true);
+  } else if (m.t === 'players') {
+    players = m.players; renderPlayers();
+  } else if (m.t === 'relay') {
+    addLine(nameOf(m.from) + ': ' + m.data.chat);
+  } else if (m.t === 'pong') {
+    $('ping').textContent = Math.round(performance.now() - m.ts);
+  } else if (m.t === 'error') {
+    if (m.fatal) {
+      session = null; localStorage.removeItem('session'); showRoom(false);
+    }
+    alert(m.msg);
+  }
+}
+
+$('create').onclick = () => connect({ t: 'create', game: 'chat', name: $('name').value });
+$('join').onclick = () => connect({ t: 'join', code: $('code').value, name: $('name').value });
+$('send').onclick = () => {
+  const text = $('msg').value.trim();
+  if (text) { send({ t: 'relay', data: { chat: text } }); $('msg').value = ''; }
+};
+$('msg').onkeydown = e => { if (e.key === 'Enter') $('send').click(); };
+
+if (session) connect({ t: 'rejoin', code: session.code, token: session.token });
+</script>
