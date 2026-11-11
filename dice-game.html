@@ -1,31 +1,33 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Liar's Dice</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:#fff;color:#18181b}
-#app{max-width:620px;margin:0 auto;padding:12px}
-button{font:inherit;padding:8px 14px;border:1px solid #d4d4d8;border-radius:8px;background:#fff;cursor:pointer}
-button:hover:not(:disabled){background:#f4f4f5}button:disabled{opacity:.4;cursor:default}
-button.p{background:#18181b;color:#fff;border-color:#18181b}
-button.r{background:#dc2626;color:#fff;border-color:#dc2626;font-weight:700;letter-spacing:.06em;width:100%;padding:14px;margin-top:8px}
-input:not([type=radio]){font:inherit;padding:8px;border:1px solid #d4d4d8;border-radius:8px}
+<style>:root{--bg:#fff;--fg:#18181b;--mut:#71717a;--line:#c4c4cc;--tbl:#efeff1}
+[data-theme=dark]{--bg:#18181b;--fg:#f4f4f5;--mut:#a1a1aa;--line:#52525b;--tbl:#2a2a2e}
+*{box-sizing:border-box}body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+#app{max-width:560px;margin:0 auto;padding:10px}
+button,select,input:not([type=radio]){font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+button{cursor:pointer}button:disabled{opacity:.4}
+button.r{background:#dc2626;color:#fff;border-color:#dc2626;font-weight:700;width:100%;padding:14px;margin-top:8px}
+h1{font-size:22px;text-align:center}h3{margin:16px 0 4px}
 .row{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin:8px 0}
-.die{--c:#52525b;width:34px;height:34px;border-radius:9px;background:var(--c);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;position:relative;vertical-align:middle}
-.die small{font-size:9px;position:absolute;right:2px;bottom:1px;opacity:.85}
-.die.sm{width:22px;height:22px;border-radius:6px;font-size:12px;margin:1px}
-.die.h{background:#e4e4e7;color:#a1a1aa}.die.m{box-shadow:0 0 0 3px #facc15}.die.x{opacity:.5}
-.die.t{outline:3px solid #2563eb;cursor:pointer;opacity:1}
-.ring{position:relative;width:min(100%,520px);aspect-ratio:1;margin:0 auto}
-.n{position:absolute;transform:translate(-50%,-50%);text-align:center;font-size:12px;width:112px;padding:4px;border-radius:10px;border:2px solid transparent}
-.n.on{border-color:#18181b}.n.out{opacity:.35}.n.t{outline:3px solid #2563eb;cursor:pointer}
-.n button{padding:2px 8px;font-size:11px}
-.ctr{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:38%}
-.msg{text-align:center;color:#52525b;min-height:20px;margin:6px 0}
-h1{font-size:22px;text-align:center}.card{border:1px solid #e4e4e7;border-radius:12px;padding:12px;margin:8px 0}
+.mut,small{color:var(--mut)}.msg{text-align:center;color:var(--mut);min-height:20px;margin:4px 0}
+.rules{font-size:14px;color:var(--mut);line-height:1.45}
+.box{border:2px solid var(--fg);border-radius:8px;padding:10px;margin:8px 0;text-align:center}
+.die{--c:#52525b;width:38px;height:38px;border-radius:9px;background:var(--c);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;position:relative;vertical-align:middle}
+.die.sm{width:20px;height:20px;border-radius:5px;font-size:11px;margin:1px}
+.die small{position:absolute;right:2px;bottom:0;font-size:9px;color:#fff}
+.die.h{background:var(--line)}.die.dim{opacity:.5}.die.t{outline:3px solid #2563eb;cursor:pointer}
+.pp{display:grid;grid:repeat(3,1fr)/repeat(3,1fr);width:74%;height:74%}.pp i{border-radius:50%;margin:10%}.pp i.o{background:#fff}
+.ring{position:relative;width:min(100%,44vh,460px);aspect-ratio:1;margin:0 auto}
+.ring::before{content:'';position:absolute;inset:17%;border-radius:50%;background:var(--tbl)}
+.n{position:absolute;transform:translate(-50%,-50%);text-align:center;font-size:11px;width:92px;padding:3px;border-radius:8px;border:2px solid transparent}
+.n.on{border-color:var(--fg)}.n.out{opacity:.35}.n.t{outline:3px solid #2563eb;cursor:pointer}
+.n button{padding:1px 6px;font-size:11px}.col{display:flex;flex-direction:column;align-items:center}
+.ctr{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:36%;line-height:1.25}
 </style></head><body><div id="app"></div>
 <script>
 // ===== CONFIG: set this to your Pi's websocket URL =====
-const SERVER = 'wss://ws.evansolid.com', GAME='liarsdice';
+const SERVER='wss://YOUR-PI-HOSTNAME', GAME='liarsdice';
 
 // ===== DICE TYPES: add a new die by adding an entry here =====
 // n=name c=color d=description. Optional action: ok(ctx)->can use, pick(ctx)->list of target kinds
@@ -96,7 +98,7 @@ const pl=id=>G.players.find(p=>p.id===id),alive=()=>G.players.filter(p=>p.hand.l
 const off=id=>{const r=roster.find(x=>x.id===id);return!r||!r.online};
 function ord(id){const P=G.players,i=Math.max(0,P.findIndex(p=>p.id===id));return[...P.slice(i),...P.slice(0,i)].filter(p=>p.hand.length)}
 const nextAlive=id=>(ord(id).find(p=>p.id!==id)||{}).id;
-const newG=()=>({phase:'lobby',mode,max:5,round:0,nid:1,players:[],picks:{},ready:{},msg:''});
+const newG=()=>({phase:'lobby',mode,max:5,round:0,nid:1,players:[],picks:{},ready:{},hist:[],msg:''});
 function pub(){const rev=['act','thief','res','over'].includes(G.phase),{picks,players,...r}=G;
  return{...r,players:players.map(p=>({id:p.id,name:p.name,n:p.hand.length,hand:rev?p.hand:undefined}))}}
 function publish(){S=pub();tx({t:'state',data:S});tx({t:'secret',data:G});
@@ -107,7 +109,7 @@ function start(){G.players=roster.map(r=>{const t=G.mode==='unusual'&&G.ready[r.
  for(const k in t)for(let i=0;i<t[k];i++)hand.push({id:G.nid++,t:k,v:1});return{id:r.id,name:r.name,hand}});
  tx({t:'lock',on:true});G.round=0;G.starter=G.players[0].id;nextRound()}
 function nextRound(){G.round++;G.players.forEach(p=>p.hand.forEach(d=>{d.v=R(6);d.l=null}));
- G.bet=null;G.res=null;G.th=null;G.act=null;G.turn=G.starter;G.phase='bet';G.msg=pl(G.turn).name+' starts the round'}
+ G.bet=null;G.hist=[];G.res=null;G.th=null;G.act=null;G.turn=G.starter;G.phase='bet';G.msg=pl(G.turn).name+' starts the round'}
 function advAct(s){const a=G.act,n=a.ord.length;
  for(let k=0;k<n;k++){const j=(s+k)%n,id=a.ord[j],p=pl(id);if(a.pass[id])continue;
   if(!p.hand.length||off(id)||!acts(G.players,p,G.bet.f).length){a.pass[id]=1;continue}a.i=j;a.cur=id;return}
@@ -144,7 +146,7 @@ function handle(from,d){if(!G)return;const ph=G.phase,P=G.players;
   else return}
  else if(ph==='bet'){if(from!==G.turn)return;
   if(d.a==='bet'){const n={q:d.q|0,f:d.f|0};if(n.q<1||n.q>P.reduce((s,p)=>s+p.hand.length,0)||n.f<2||n.f>6||!valid(n,G.bet))return;
-   G.bet={...n,by:from};G.turn=nextAlive(from);G.msg=pl(from).name+' bets '+n.q+' × '+n.f}
+   if(G.bet)G.hist.push([G.bet.q,G.bet.f]);G.bet={...n,by:from};G.turn=nextAlive(from);G.msg=pl(from).name+' bets '+n.q+' × '+n.f}
   else if(d.a==='liar'&&G.bet){G.caller=from;P.forEach(p=>p.hand.forEach(x=>x.t==='reroll'&&(x.v=R(6))));
    G.msg=pl(from).name+' calls '+pl(G.bet.by).name+' a liar!';
    if(G.mode==='classic')score();else{G.phase='act';G.act={pass:{},i:0,ord:ord(from).map(p=>p.id)};advAct(0)}}
@@ -159,43 +161,58 @@ function handle(from,d){if(!G)return;const ph=G.phase,P=G.players;
  publish()}
 
 // ===== UI =====
+let cs={theme:'light',faces:'numbers',sort:'off'},showSet=false;
+try{cs={...cs,...JSON.parse(localStorage.cs)}}catch{}
+const PIP=[0,[4],[0,8],[0,4,8],[0,2,6,8],[0,2,4,6,8],[0,2,3,5,6,8]];
+const face=v=>cs.faces==='pips'?`<span class=pp>${[0,1,2,3,4,5,6,7,8].map(i=>`<i${PIP[v].includes(i)?' class=o':''}></i>`).join('')}</span>`:v;
 const nm=id=>(S.players.find(p=>p.id===id)||{}).name||'?';
-const dieSq=f=>`<span class="die" style="--c:#18181b">${f}</span>`;
-const cx=()=>{const P=S.players,p=P.find(x=>x.id===me);return ctx(P,p,p.hand.find(d=>d.id===sel.die),S.bet&&S.bet.f)};
+const srt=(h,P)=>cs.sort==='on'?[...h].sort((a,b)=>sv(P,a)-sv(P,b)):h;
+const dieSq=f=>`<span class=die style="--c:#18181b">${face(f)}</span>`;
+const cx0=id=>{const P=S.players,p=P.find(x=>x.id===me);return ctx(P,p,p.hand.find(d=>d.id===id),S.bet&&S.bet.f)};
+const cx=()=>cx0(sel.die);
 const fire=()=>{send({a:'act',die:sel.die,picks:sel.picks});sel=null;render()};
 const pd=id=>{sel.picks.push(id);sel.picks.length===sel.kinds.length?fire():render()},pp=pd;
-function sa(did){const p=S.players.find(x=>x.id===me),d=p.hand.find(x=>x.id===did);
- sel={die:did,kinds:DICE[d.t].pick(cx0(did)),picks:[]};sel.kinds.length?render():fire()}
-const cx0=did=>{const P=S.players,p=P.find(x=>x.id===me);return ctx(P,p,p.hand.find(d=>d.id===did),S.bet&&S.bet.f)};
+function sa(did){const d=S.players.find(x=>x.id===me).hand.find(x=>x.id===did);sel={die:did,kinds:DICE[d.t].pick(cx0(did)),picks:[]};sel.kinds.length?fire():render()}
 const hint=()=>'Select '+({'die:opp':"an opponent's die",'die:own':'one of your other dice','die:free':'a die to attach to','die:swap':"an opponent's die showing "+S.bet.f,'player:free':'an opponent (no Shield)'})[sel.kinds[sel.picks.length]];
-function adj(dq,df){const n={q:draft.q+dq,f:draft.f+df};if(n.f<2||n.f>6||n.q<1||n.q>S.players.reduce((s,p)=>s+p.n,0)||!valid(n,S.bet))return;draft=n;render()}
 const cfg=dl=>send({a:'cfg',max:S.max+dl});
 const rdy=()=>send({a:'ready',picks:S.ready[me]?null:{...picks}});
-function pc(k,dl){const n=(picks[k]||0)+dl,u=Object.values(picks).reduce((a,b)=>a+b,0)+dl;if(n<0||u>S.max)return;picks[k]=n;S.ready[me]?send({a:'ready',picks:null}):render()}
+function pk(v,k){picks[k]=+v;S.ready[me]?send({a:'ready',picks:null}):render()}
+function setc(k,v){cs[k]=v;try{localStorage.cs=JSON.stringify(cs)}catch{}render()}
+const sopt=(k,l)=>`<select onchange="setc('${k}',this.value)">${l.map(([v,t])=>`<option value="${v}"${cs[k]===v?' selected':''}>${t}</option>`).join('')}</select>`;
+const settings=()=>showSet?`<div class=row><label>Theme ${sopt('theme',[['light','Light'],['dark','Dark']])}</label><label>Dice ${sopt('faces',[['numbers','Numbers'],['pips','Pips']])}</label><label>Sort my dice ${sopt('sort',[['off','Off'],['on','On']])}</label></div>`:'';
 
-function render(){const a=$('#app');
- if(!code){if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
-  a.innerHTML=`<h1>Liar's Dice</h1><div class=card><div class=row><input placeholder="Your name" maxlength=16 value="${esc(uname)}" oninput="uname=this.value"></div>
+const menu=()=>`<h1>Liar's Dice</h1>
+<div class=row><input placeholder="Your name" maxlength=16 value="${esc(uname)}" oninput="uname=this.value"></div>
 <div class=row><label><input type=radio name=md ${mode==='classic'?'checked':''} onchange="mode='classic'"> Classic</label>
-<label><input type=radio name=md ${mode==='unusual'?'checked':''} onchange="mode='unusual'"> Unusual</label>
-<button class=p onclick="go({t:'create',game:GAME,name:uname})">Create game</button></div>
-<div class=row><input placeholder="CODE" maxlength=4 size=5 value="${esc(ccode)}" oninput="ccode=this.value.toUpperCase()">
-<button onclick="go({t:'join',code:ccode,name:uname})">Join game</button></div><div class=msg style="color:#dc2626">${esc(err)}</div></div>`;return}
- const H=host===me;
- a.innerHTML=`<div class=row style="justify-content:space-between"><b>Room ${code}</b><span>${conn?'':'reconnecting… '}<button onclick="${H?"tx({t:'close'})":'leave()'}">${H?'Close room':'Leave'}</button></span></div>`+
-  (!S?'<div class=msg>Waiting for host…</div>':S.phase==='lobby'?lobby():table())}
+<label><input type=radio name=md ${mode==='unusual'?'checked':''} onchange="mode='unusual'"> Unusual</label></div>
+<div class=row><button onclick="go({t:'create',game:GAME,name:uname})">Create game</button></div>
+<div class=row><input placeholder="Room code" maxlength=4 size=8 value="${esc(ccode)}" oninput="ccode=this.value.toUpperCase()"><button onclick="go({t:'join',code:ccode,name:uname})">Join game</button></div>
+<div class=msg style="color:#dc2626">${esc(err)}</div>
+<div class=rules><h3>How to play</h3>
+<p>Everyone rolls their dice in secret. Players take turns making a bet about how many dice of one face (2 to 6) are on the whole table, for example "four 5s". Ones are wild and count as every face.</p>
+<p>Each bet must be higher than the last: more dice, or the same number of dice with a higher face. Instead of raising, you can call the previous player a liar.</p>
+<p>When Liar is called, everyone reveals their dice. If there are at least as many matching dice as the bet, the caller loses a die. Otherwise the bettor loses one. The loser starts the next round, and the last player with dice wins.</p>
+<p>Unusual mode adds special dice types with abilities. After Liar is called, players take turns using them before the count.</p></div>`;
+
+function render(){document.body.dataset.theme=cs.theme;const a=$('#app'),H=host===me;
+ const bar=`<div class=row style="justify-content:space-between"><b>${code&&(!S||S.phase==='lobby')?'Room '+code:''}</b><span>${conn||!code?'':'reconnecting… '}<button onclick="showSet=!showSet;render()">Settings</button>${code?` <button onclick="${H?"tx({t:'close'})":'leave()'}">${H?'Close room':'Leave'}</button>`:''}</span></div>${settings()}`;
+ if(!code){if(document.activeElement&&document.activeElement.tagName==='INPUT')return;a.innerHTML=bar+menu();return}
+ a.innerHTML=bar+(!S?'<div class=msg>Waiting for host…</div>':S.phase==='lobby'?lobby():table())}
 
 function lobby(){const un=S.mode==='unusual',H=host===me;
  if(S.max!==lm){lm=S.max;picks={normal:S.max}}
  const used=Object.values(picks).reduce((a,b)=>a+b,0),rd=S.ready[me];
- let h=`<div class=card><b>${un?'Unusual':'Classic'} mode</b> · ${S.max} dice each<div>${roster.map(r=>esc(r.name)+(r.id===host?' ★':'')+(un&&S.ready[r.id]?' ✓':'')+(r.online?'':' (offline)')).join(', ')}</div></div>`;
- if(H)h+=`<div class=row>Dice each <button onclick="cfg(-1)">−</button><b>${S.max}</b><button onclick="cfg(1)">+</button></div>`;
- if(un)h+=`<div class=card><b>Choose your dice</b> (${used}/${S.max})`+Object.keys(DICE).map(k=>`<div class=row style="justify-content:space-between;margin:4px 0"><span style="text-align:left"><span class="die sm" style="--c:${DICE[k].c}"></span> <b>${DICE[k].n}</b><br><small style="color:#71717a">${DICE[k].d}</small></span><span><button onclick="pc('${k}',-1)">−</button> ${picks[k]||0} <button onclick="pc('${k}',1)">+</button></span></div>`).join('')+
-  `<div class=row><button class=p onclick="rdy()" ${used<1||used>S.max?'disabled':''}>${rd?'Not ready':'Ready'}</button></div></div>`;
- return h+(H?`<div class=row><button class=p onclick="send({a:'start'})" ${roster.length<2?'disabled':''}>Start game</button></div>${roster.length<2?'<div class=msg>Need at least 2 players</div>':''}`:'<div class=msg>Waiting for the host to start…</div>')}
+ let h=`<div class=msg><b>${un?'Unusual':'Classic'} mode</b><br>${roster.map(r=>esc(r.name)+(r.id===host?' (host)':'')+(un&&S.ready[r.id]?' ✓':'')+(r.online?'':' (offline)')).join(', ')}</div>
+<div class=row style="flex-direction:column;gap:4px;margin:16px 0">Dice each<b style="font-size:44px;line-height:1">${S.max}</b>${H?`<div><button onclick="cfg(-1)">−</button> <button onclick="cfg(1)">+</button></div>`:''}</div>`;
+ if(un)h+=`<h3 style="text-align:center">Choose your dice (${used}/${S.max})</h3>`+Object.keys(DICE).map(k=>`<div class=row style="justify-content:space-between;flex-wrap:nowrap"><span><span class="die sm" style="--c:${DICE[k].c}"></span> <b>${DICE[k].n}</b><br><small>${DICE[k].d}</small></span><select onchange="pk(this.value,'${k}')">${Array.from({length:S.max+1},(_,i)=>`<option${(picks[k]||0)===i?' selected':''}>${i}</option>`).join('')}</select></div>`).join('')+
+  `<div class=row><button onclick="rdy()" ${used<1||used>S.max?'disabled':''}>${rd?'Not ready':'Ready'}</button></div>`;
+ return h+(H?`<div class=row><button onclick="send({a:'start'})" ${roster.length<2?'disabled':''}>Start game</button></div>`:'<div class=msg>Waiting for the host to start…</div>')+`<div class=msg>No one can join once the game starts.${H&&roster.length<2?' You need at least 2 players.':''}</div>`}
 
-function dh(d,P,c,k){const D=DICE[d.t],s=sv(P,d),e=ev(P,d),b=S.bet,m=b&&(e===b.f||e===1),t=k&&k[0]==='d'&&!sel.picks.includes(d.id)&&chk(k,d.id,c);
- return`<span class="die sm ${m?'m':'x'} ${t?'t':''}" style="--c:${D.c}" title="${D.n}: ${D.d}" ${t?`onclick="pd(${d.id})"`:''}>${s}${d.t==='little'?`<small>${e}</small>`:''}${d.l?'<small style="left:2px;right:auto">+</small>':''}</span>`}
+function dh(d,P,c,k){const D=DICE[d.t],e=ev(P,d),b=S.bet,mt=e===b.f||e===1,t=k&&k[0]==='d'&&!sel.picks.includes(d.id)&&chk(k,d.id,c);
+ return`<span class="die sm${t?' t':mt?'':' dim'}" style="--c:${D.c}" title="${D.n}: ${D.d}" ${t?`onclick="pd(${d.id})"`:''}>${face(sv(P,d))}${d.t==='little'?`<small>${e}</small>`:''}${d.l?'<small style="left:2px;right:auto">+</small>':''}</span>`}
+function rev(p,P,c,k,an){const f=S.bet.f,ds=srt(p.hand,P),m=ds.filter(d=>{const e=ev(P,d);return e===f||e===1}),o=ds.filter(d=>!m.includes(d)),
+ up=`<div style="transform:translate(${-Math.cos(an)*26}px,${-Math.sin(an)*26}px)">${m.map(d=>dh(d,P,c,k)).join('')}</div>`,dn=`<div>${o.map(d=>dh(d,P,c,k)).join('')}</div>`;
+ return`<div class=col>${Math.sin(an)>0?up+dn:dn+up}</div>`}
 
 function table(){const P=S.players,N=P.length,mi=Math.max(0,P.findIndex(p=>p.id===me)),ph=S.phase,b=S.bet,H=host===me;
  const cur=ph==='bet'?S.turn:ph==='act'?S.act.cur:ph==='thief'&&S.th.cur?S.th.cur.p:null;
@@ -203,27 +220,29 @@ function table(){const P=S.players,N=P.length,mi=Math.max(0,P.findIndex(p=>p.id=
  else if(sel&&!(cur===me&&(ph==='act'||ph==='thief')))sel=null;
  const c=sel&&cx(),k=sel&&sel.kinds[sel.picks.length];
  const ring=P.map((p,i)=>{const an=(90+(i-mi)*360/N)*Math.PI/180,r=roster.find(x=>x.id===p.id),ofl=!r||!r.online,tp=k&&k[0]==='p'&&chk(k,p.id,c);
-  const ds=p.hand?p.hand.map(d=>dh(d,P,c,k)).join(''):'<span class="die sm h">?</span>'.repeat(p.n);
-  return`<div class="n ${p.id===cur?'on':''} ${p.n?'':'out'} ${tp?'t':''}" style="left:${50+35*Math.cos(an)}%;top:${50+35*Math.sin(an)}%" ${tp?`onclick="pp('${p.id}')"`:''}><b>${esc(p.name)}</b>${p.id===me?' (you)':''}${ofl?' · offline':''}<div>${ds||'out'}</div>${ofl&&H&&p.n?`<button onclick="tx({t:'kick',id:'${p.id}'})">Kick</button>`:''}</div>`}).join('');
- const ctr=S.res&&(ph==='res'||ph==='over')?`<b style="font-size:22px">${S.res.total}</b><br><small>counted (bet ${b.q} × ${b.f})</small>`:
-  b?`<div style="font-size:26px;font-weight:700">${b.q} × ${dieSq(b.f)}</div><small>${esc(nm(b.by))}</small>`:'<small>No bet yet</small>';
- return`<div class=ring>${ring}<div class=ctr>${ctr}</div></div><div class=msg>${esc(S.msg||'')}</div>`+ctl(P,P[mi],cur)}
+  const ds=p.hand?rev(p,P,c,k,an):'<span class="die sm h"></span>'.repeat(p.n);
+  return`<div class="n${p.id===cur?' on':''}${p.n?'':' out'}${tp?' t':''}" style="left:${50+35*Math.cos(an)}%;top:${50+35*Math.sin(an)}%" ${tp?`onclick="pp('${p.id}')"`:''}><b>${esc(p.name)}</b>${p.id===me?' (you)':''}${ofl?' · offline':''}<div>${ds||'out'}</div>${ofl&&H&&p.n?`<button onclick="tx({t:'kick',id:'${p.id}'})">Kick</button>`:''}</div>`}).join('');
+ const hs=(S.hist||[]).slice(-3);
+ const ctr=S.res&&(ph==='res'||ph==='over')?`<b style="font-size:22px">${S.res.total}</b><br><small>counted for ${b.q} × ${b.f}s</small>`:
+  b?`<div class=mut style="font-size:12px">${hs.map(([q,f],i)=>`<div style="opacity:${[.25,.4,.6][3-hs.length+i]}">${q} × ${f}s</div>`).join('')}</div><div style="font-size:24px;font-weight:700">${b.q} × ${dieSq(b.f)}</div><small>${esc(nm(b.by))}</small>`:'<small>No bet yet</small>';
+ const ty=ph==='bet'||S.mode!=='unusual'?[]:[...new Set(P.flatMap(p=>(p.hand||[]).map(d=>d.t)))];
+ return`<div class=ring>${ring}<div class=ctr>${ctr}</div></div>${ty.length?`<div class=row style="font-size:11px;gap:10px">${ty.map(t=>`<span><span class="die sm" style="--c:${DICE[t].c}"></span> ${DICE[t].n}</span>`).join('')}</div>`:''}<div class=msg>${esc(S.msg||'')}</div>`+ctl(P,P[mi],cur)}
 
-function ctl(P,mp,cur){const ph=S.phase;
- if(ph==='bet'){let h=`<div class=row>${myDice.map(d=>`<span class=die style="--c:${DICE[d.t].c}" title="${DICE[d.t].n}: ${DICE[d.t].d}">${d.v}</span>`).join('')}</div>`;
+function ctl(P,mp,cur){const ph=S.phase,b=S.bet;
+ if(ph==='bet'){const tot=P.reduce((s,p)=>s+p.n,0),un=S.mode==='unusual';
+  const h=`<div class=row style="gap:6px">${srt(myDice,[]).map(d=>`<span style="text-align:center"><span class=die style="--c:${DICE[d.t].c}" title="${DICE[d.t].n}: ${DICE[d.t].d}">${face(d.v)}</span>${un?`<br><small>${DICE[d.t].n}</small>`:''}</span>`).join('')}</div>`;
   if(S.turn!==me)return h+`<div class=msg>Waiting for ${esc(nm(S.turn))}…</div>`;
-  const key=S.round+'|'+(S.bet?S.bet.q+'x'+S.bet.f:'');
-  if(dk!==key){dk=key;draft=S.bet?(S.bet.f<6?{q:S.bet.q,f:S.bet.f+1}:{q:S.bet.q+1,f:2}):{q:1,f:2}}
-  const ok=draft.q<=P.reduce((s,p)=>s+p.n,0)&&valid(draft,S.bet);
-  return h+`<div class=row>Quantity <button onclick="adj(-1,0)">−</button><b>${draft.q}</b><button onclick="adj(1,0)">+</button> &nbsp; Face <button onclick="adj(0,-1)">−</button>${dieSq(draft.f)}<button onclick="adj(0,1)">+</button></div>
-<div class=row><button class=p onclick="send({a:'bet',q:draft.q,f:draft.f})" ${ok?'':'disabled'}>Confirm bet</button></div>${S.bet?`<button class=r onclick="send({a:'liar'})">LIAR</button>`:''}`}
+  const o=[];for(let q=b?b.q:1;q<=tot;q++)for(let f=2;f<=6;f++)if(valid({q,f},b))o.push([q,f]);
+  const key=S.round+'|'+(b?b.q+'x'+b.f:'');if(dk!==key){dk=key;draft=o.length?{q:o[0][0],f:o[0][1]}:null}
+  return h+(o.length?`<div class=box><b>Your bet</b><br><select size=5 style="width:100%;margin:8px 0" onchange="const[q,f]=this.value.split('x');draft={q:+q,f:+f}">${o.map(([q,f])=>`<option value="${q}x${f}"${draft&&draft.q===q&&draft.f===f?' selected':''}>${q} × ${f}s</option>`).join('')}</select><br><button onclick="send({a:'bet',q:draft.q,f:draft.f})">Confirm bet</button></div>`:'')+
+   (b?`<button class=r onclick="send({a:'liar'})">Call ${esc(nm(b.by))} a Liar</button>`:'')}
  if(ph==='act'){if(cur!==me)return`<div class=msg>${esc(nm(cur))} is choosing an action…</div>`;
   if(sel)return`<div class=msg>${hint()}</div><div class=row><button onclick="sel=null;render()">Cancel</button></div>`;
-  return`<div class=msg>Your action</div><div class=row>${acts(P,mp,S.bet.f).map(d=>`<button onclick="sa(${d.id})"><span class="die sm" style="--c:${DICE[d.t].c}">${sv(P,d)}</span> ${DICE[d.t].n}</button>`).join('')}<button onclick="send({a:'pass'})">Pass</button></div>`}
+  return`<div class=msg>Your action</div><div class=row>${acts(P,mp,b.f).map(d=>`<button onclick="sa(${d.id})">${DICE[d.t].n} (${sv(P,d)})</button>`).join('')}<button onclick="send({a:'pass'})">Pass</button></div>`}
  if(ph==='thief')return cur===me?`<div class=msg>Thief: ${hint()}</div><div class=row><button onclick="send({a:'pass'})">Skip</button></div>`:`<div class=msg>${cur?esc(nm(cur))+' is deciding on a Thief swap…':''}</div>`;
  const r=S.res;
- if(ph==='res')return`<div class=card style="text-align:center"><b>${r.total}</b> dice count for ${S.bet.f}s against a bet of ${S.bet.q}. <b>${esc(nm(r.loser))}</b> loses ${r.lost?'a '+DICE[r.lost].n+' die':'a die'}.</div><div class=row><button class=p onclick="send({a:'next'})">Next round</button></div>`;
- return`<div class=card style="text-align:center;font-size:20px"><b>${esc(nm(S.winner))}</b> wins!</div>${host===me?`<div class=row><button class=p onclick="send({a:'again'})">Back to lobby</button></div>`:''}`}
+ if(ph==='res')return`<div class=msg style="color:var(--fg)"><b>${r.total}</b> dice count for ${b.f}s against a bet of ${b.q}. <b>${esc(nm(r.loser))}</b> loses ${r.lost?'a '+DICE[r.lost].n+' die':'a die'}.</div><div class=row><button onclick="send({a:'next'})">Next round</button></div>`;
+ return`<div class=row style="font-size:20px"><b>${esc(nm(S.winner))}</b> wins!</div>${host===me?`<div class=row><button onclick="send({a:'again'})">Back to lobby</button></div>`:''}`}
 
 try{const s=JSON.parse(sessionStorage.s||'null');if(s){code=s.code;token=s.token;open({t:'rejoin',code,token})}}catch{}
 render();
