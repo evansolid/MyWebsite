@@ -1,110 +1,230 @@
-<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chat test</title>
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Liar's Dice</title>
 <style>
-  body { font-family: sans-serif; max-width: 600px; margin: 2em auto; padding: 0 1em; }
-  #log { border: 1px solid #888; height: 300px; overflow-y: auto; padding: .5em; margin: .5em 0; }
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: gray; }
-</style>
-
-<h2><span class="dot" id="dot"></span> Chat test</h2>
-
-<div id="lobby">
-  <input id="name" placeholder="Your name" maxlength="16">
-  <button id="create">Create room</button><br><br>
-  <input id="code" placeholder="CODE" maxlength="4" size="6">
-  <button id="join">Join room</button>
-</div>
-
-<div id="room test" hidden>
-  <div>Room <b id="roomcode"></b> · ping <span id="ping">–</span> ms · <span id="status"></span></div>
-  <div id="players"></div>
-  <div id="log"></div>
-  <input id="msg" placeholder="Type a message" size="40">
-  <button id="send">Send</button>
-</div>
-
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:#fff;color:#18181b}
+#app{max-width:620px;margin:0 auto;padding:12px}
+button{font:inherit;padding:8px 14px;border:1px solid #d4d4d8;border-radius:8px;background:#fff;cursor:pointer}
+button:hover:not(:disabled){background:#f4f4f5}button:disabled{opacity:.4;cursor:default}
+button.p{background:#18181b;color:#fff;border-color:#18181b}
+button.r{background:#dc2626;color:#fff;border-color:#dc2626;font-weight:700;letter-spacing:.06em;width:100%;padding:14px;margin-top:8px}
+input:not([type=radio]){font:inherit;padding:8px;border:1px solid #d4d4d8;border-radius:8px}
+.row{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.die{--c:#52525b;width:34px;height:34px;border-radius:9px;background:var(--c);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;position:relative;vertical-align:middle}
+.die small{font-size:9px;position:absolute;right:2px;bottom:1px;opacity:.85}
+.die.sm{width:22px;height:22px;border-radius:6px;font-size:12px;margin:1px}
+.die.h{background:#e4e4e7;color:#a1a1aa}.die.m{box-shadow:0 0 0 3px #facc15}.die.x{opacity:.5}
+.die.t{outline:3px solid #2563eb;cursor:pointer;opacity:1}
+.ring{position:relative;width:min(100%,520px);aspect-ratio:1;margin:0 auto}
+.n{position:absolute;transform:translate(-50%,-50%);text-align:center;font-size:12px;width:112px;padding:4px;border-radius:10px;border:2px solid transparent}
+.n.on{border-color:#18181b}.n.out{opacity:.35}.n.t{outline:3px solid #2563eb;cursor:pointer}
+.n button{padding:2px 8px;font-size:11px}
+.ctr{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:38%}
+.msg{text-align:center;color:#52525b;min-height:20px;margin:6px 0}
+h1{font-size:22px;text-align:center}.card{border:1px solid #e4e4e7;border-radius:12px;padding:12px;margin:8px 0}
+</style></head><body><div id="app"></div>
 <script>
-const SERVER = 'wss://ws.evansolid.com';
-const $ = id => document.getElementById(id);
-let ws, session = JSON.parse(localStorage.getItem('session') || 'null');
-let retry = 0, pingTimer, players = [];
+// ===== CONFIG: set this to your Pi's websocket URL =====
+const SERVER = 'wss://ws.evansolid.com', GAME='liarsdice';
 
-function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
-
-function connect(first) {
-  ws = new WebSocket(SERVER);
-  ws.onopen = () => {
-    retry = 0;
-    $('status').textContent = 'connected';
-    $('dot').style.background = 'limegreen';
-    send(first);
-    clearInterval(pingTimer);
-    pingTimer = setInterval(() => send({ t: 'ping', ts: performance.now() }), 2000);
-  };
-  ws.onmessage = e => handle(JSON.parse(e.data));
-  ws.onclose = () => {
-    clearInterval(pingTimer);
-    $('status').textContent = 'disconnected, retrying...';
-    $('dot').style.background = 'red';
-    if (session) {
-      setTimeout(() => connect({ t: 'rejoin', code: session.code, token: session.token }),
-                 Math.min(1000 * 2 ** retry++, 10000));
-    }
-  };
-}
-
-function showRoom(show) {
-  $('lobby').hidden = show;
-  $('room').hidden = !show;
-}
-
-function addLine(text) {
-  const d = document.createElement('div');
-  d.textContent = text;
-  $('log').appendChild(d);
-  $('log').scrollTop = $('log').scrollHeight;
-}
-
-const nameOf = id => (players.find(p => p.id === id) || {}).name || '?';
-
-function renderPlayers() {
-  $('players').textContent = 'Players: ' +
-    players.map(p => p.name + (p.online ? '' : ' (offline)')).join(', ');
-}
-
-function handle(m) {
-  if (m.t === 'joined') {
-    session = { code: m.code, token: m.token };
-    localStorage.setItem('session', JSON.stringify(session));
-    players = m.players;
-    $('roomcode').textContent = m.code;
-    $('log').textContent = '';
-    m.log.forEach(e => addLine(nameOf(e.from) + ': ' + e.data.chat));
-    renderPlayers();
-    showRoom(true);
-  } else if (m.t === 'players') {
-    players = m.players; renderPlayers();
-  } else if (m.t === 'relay') {
-    addLine(nameOf(m.from) + ': ' + m.data.chat);
-  } else if (m.t === 'pong') {
-    $('ping').textContent = Math.round(performance.now() - m.ts);
-  } else if (m.t === 'error') {
-    if (m.fatal) {
-      session = null; localStorage.removeItem('session'); showRoom(false);
-    }
-    alert(m.msg);
-  }
-}
-
-$('create').onclick = () => connect({ t: 'create', game: 'chat', name: $('name').value });
-$('join').onclick = () => connect({ t: 'join', code: $('code').value, name: $('name').value });
-$('send').onclick = () => {
-  const text = $('msg').value.trim();
-  if (text) { send({ t: 'relay', data: { chat: text } }); $('msg').value = ''; }
+// ===== DICE TYPES: add a new die by adding an entry here =====
+// n=name c=color d=description. Optional action: ok(ctx)->can use, pick(ctx)->list of target kinds
+// ('die:opp','die:own','die:free','player:free'), run(ctx,targets)->log text. Passive dice (Normal,
+// Chameleon, Little Guy, Reroll, Thief, Shield) are handled by sv/ev/tally/score below.
+const DICE={
+normal:{n:'Normal',c:'#52525b',d:'Counts as itself. Lost first when you lose a die.'},
+cham:{n:'Chameleon',c:'#16a34a',d:'Counts once extra for each other die type in your hand showing 2, 4 or 6.'},
+adder:{n:'Adder',c:'#ea8a0c',d:'Action: attach to another die. Both become (sum mod 6) and count at that value.',
+ ok:c=>!c.d.l&&c.fd>0,pick:()=>['die:free'],run:(c,[t])=>{c.d.l=t.id;t.l=c.d.id;return c.p.name+' attaches an Adder'}},
+attack:{n:'Attack',c:'#dc2626',d:'Action: sacrifice to destroy an opponent die (a Shield is lost instead).',
+ ok:c=>c.opps.length>0,pick:()=>['die:opp'],run:(c,[t])=>{const o=c.owner(t),s=o.hand.find(x=>x.t==='shield');c.sac(c.d);c.sac(s||t);return c.p.name+' attacks '+o.name+(s?' (Shield lost)':'')}},
+shield:{n:'Shield',c:'#2563eb',d:'Blocks one Attack on you (lost instead). While held, Chaos cannot target you.'},
+little:{n:'Little Guy',c:'#0d9488',d:'Counts as half its face, rounded up (1,1,2,2,3,3).'},
+ruckus:{n:'Ruckus',c:'#db2777',d:'Action: sacrifice to reroll an opponent die and one of yours (two of yours if no opponents).',
+ ok:c=>c.opps.length>0||c.own>1,pick:c=>c.opps.length?(c.own?['die:opp','die:own']:['die:opp']):['die:own','die:own'],
+ run:(c,t)=>{c.sac(c.d);t.forEach(x=>x.v=R(6));return c.p.name+' causes a Ruckus'}},
+chaos:{n:'Chaos',c:'#7c3aed',d:'Action: sacrifice to give an opponent a Reroll die and yourself a Normal die.',
+ ok:()=>true,pick:c=>c.np.length?['player:free']:[],run:(c,[t])=>{c.sac(c.d);c.add(t||c.p,'reroll');c.add(c.p,'normal');return c.p.name+' unleashes Chaos'}},
+reroll:{n:'Reroll',c:'#ca8a04',d:'Rerolled as soon as Liar is called, before scoring.'},
+thief:{n:'Thief',c:'#475569',d:'After scoring, if it shows the called face, swap it with an opponent die showing that face.'}
 };
-$('msg').onkeydown = e => { if (e.key === 'Enter') $('send').click(); };
 
-if (session) connect({ t: 'rejoin', code: session.code, token: session.token });
-</script>
+// ===== SHARED RULES (used by host logic and every client's UI) =====
+const $=s=>document.querySelector(s),R=n=>1+Math.floor(Math.random()*n);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
+const find=(P,id)=>{for(const p of P){const d=p.hand.find(x=>x.id===id);if(d)return[p,d]}return[]};
+const sv=(P,d)=>{const q=d.l&&find(P,d.l)[1];return q?(d.v+q.v-1)%6+1:d.v};          // shown value (after Adder)
+const ev=(P,d)=>d.t==='little'?Math.ceil(sv(P,d)/2):sv(P,d);                         // counted value
+const shd=p=>p.hand.some(x=>x.t==='shield');
+function tally(P,f){let n=0;for(const p of P){const ty=new Set;p.hand.forEach(d=>sv(P,d)%2===0&&ty.add(d.t));ty.delete('cham');
+ for(const d of p.hand){const e=ev(P,d);if(e===f||e===1)n+=d.t==='cham'?1+ty.size:1}}return n}
+const ctx=(P,p,d,f)=>{const opps=P.filter(x=>x!==p&&x.hand.length);
+ return{P,p,d,f,opps,np:opps.filter(x=>!shd(x)),own:p.hand.length-1,fd:P.reduce((n,x)=>n+x.hand.filter(y=>y!==d&&!y.l).length,0)}};
+function chk(k,id,c){const[o,t]=find(c.P,id);
+ if(k==='die:opp')return!!t&&o!==c.p;
+ if(k==='die:own')return!!t&&o===c.p&&t!==c.d;
+ if(k==='die:free')return!!t&&t!==c.d&&!t.l;
+ if(k==='die:swap')return!!t&&o!==c.p&&sv(c.P,t)===c.f;
+ return k==='player:free'&&c.np.some(x=>x.id===id)}
+const acts=(P,p,f)=>p.hand.filter(d=>{const D=DICE[d.t];return D.ok&&D.ok(ctx(P,p,d,f))});
+const valid=(n,b)=>!b||n.q>b.q||n.q===b.q&&n.f>b.f;
+
+// ===== NETWORK =====
+let ws,me,host,code,token,roster=[],S=null,G=null,myDice=[],mode='classic',err='',conn=0,sel=null,draft=null,dk='',picks={normal:5},lm=5,uname='',ccode='';
+const tx=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))};
+function open(first){ws=new WebSocket(SERVER);ws.onopen=()=>{conn=1;tx(first);render()};ws.onmessage=e=>onMsg(JSON.parse(e.data));
+ ws.onclose=()=>{conn=0;if(code&&token)setTimeout(()=>open({t:'rejoin',code,token}),2000);render()}}
+const go=m=>{err='';ws&&ws.readyState===1?tx(m):open(m)};
+function reset(){code=token=host=null;S=G=null;myDice=[];sel=null;sessionStorage.removeItem('s');if(ws){ws.onclose=null;ws.close()}conn=0}
+const leave=()=>{tx({t:'leave'});reset();render()};
+const send=d=>host===me?handle(me,d):tx({t:'relay',to:host,data:d});
+function onMsg(m){switch(m.t){
+case'joined':code=m.code;token=m.token;me=m.id;host=m.host;roster=m.players;S=m.state;myDice=(m.priv&&m.priv.dice)||[];
+ sessionStorage.s=JSON.stringify({code,token});
+ if(m.secret)G=m.secret;else if(host===me){G=newG();publish();return}break;
+case'players':roster=m.players;host=m.host;if(host===me&&G){onRoster();return}break;
+case'state':S=m.data;break;
+case'priv':myDice=m.data.dice;break;
+case'relay':if(host===me&&m.data)handle(m.from,m.data);return;
+case'host':host=me;G=m.secret||newG();break;
+case'closed':err='Room closed';reset();break;
+case'error':err=m.msg;if(m.fatal)reset();break}
+render()}
+
+// ===== HOST-SIDE GAME LOGIC (runs only in the host's browser) =====
+const pl=id=>G.players.find(p=>p.id===id),alive=()=>G.players.filter(p=>p.hand.length);
+const off=id=>{const r=roster.find(x=>x.id===id);return!r||!r.online};
+function ord(id){const P=G.players,i=Math.max(0,P.findIndex(p=>p.id===id));return[...P.slice(i),...P.slice(0,i)].filter(p=>p.hand.length)}
+const nextAlive=id=>(ord(id).find(p=>p.id!==id)||{}).id;
+const newG=()=>({phase:'lobby',mode,max:5,round:0,nid:1,players:[],picks:{},ready:{},msg:''});
+function pub(){const rev=['act','thief','res','over'].includes(G.phase),{picks,players,...r}=G;
+ return{...r,players:players.map(p=>({id:p.id,name:p.name,n:p.hand.length,hand:rev?p.hand:undefined}))}}
+function publish(){S=pub();tx({t:'state',data:S});tx({t:'secret',data:G});
+ G.players.forEach(p=>tx({t:'priv',to:p.id,data:{dice:p.hand}}));const m=pl(me);myDice=m?m.hand:[];render()}
+function sac(d){const[o]=find(G.players,d.id);if(!o)return;o.hand=o.hand.filter(x=>x!==d);const q=d.l&&find(G.players,d.l)[1];if(q)q.l=null}
+const hc=(p,d)=>({...ctx(G.players,p,d,G.bet&&G.bet.f),sac,add:(q,t)=>q.hand.push({id:G.nid++,t,v:R(6)}),owner:t=>find(G.players,t.id)[0]});
+function start(){G.players=roster.map(r=>{const t=G.mode==='unusual'&&G.ready[r.id]?G.picks[r.id]:{normal:G.max},hand=[];
+ for(const k in t)for(let i=0;i<t[k];i++)hand.push({id:G.nid++,t:k,v:1});return{id:r.id,name:r.name,hand}});
+ tx({t:'lock',on:true});G.round=0;G.starter=G.players[0].id;nextRound()}
+function nextRound(){G.round++;G.players.forEach(p=>p.hand.forEach(d=>{d.v=R(6);d.l=null}));
+ G.bet=null;G.res=null;G.th=null;G.act=null;G.turn=G.starter;G.phase='bet';G.msg=pl(G.turn).name+' starts the round'}
+function advAct(s){const a=G.act,n=a.ord.length;
+ for(let k=0;k<n;k++){const j=(s+k)%n,id=a.ord[j],p=pl(id);if(a.pass[id])continue;
+  if(!p.hand.length||off(id)||!acts(G.players,p,G.bet.f).length){a.pass[id]=1;continue}a.i=j;a.cur=id;return}
+ score()}
+function score(){const b=G.bet,P=G.players,total=tally(P,b.f),ok=total>=b.q,loser=ok?G.caller:b.by,lp=pl(loser);
+ G.res={total,ok,loser};
+ if(lp.hand.length){const pool=lp.hand.filter(d=>d.t==='normal'),c=pool.length?pool:lp.hand,d=c[R(c.length)-1];G.res.lost=d.t;sac(d)}
+ const q=[];ord(G.caller).forEach(p=>p.hand.forEach(d=>d.t==='thief'&&sv(P,d)===b.f&&q.push({p:p.id,d:d.id})));
+ G.th={q,i:0};G.phase='thief';advThief(0)}
+function advThief(i){const t=G.th;
+ for(;i<t.q.length;i++){const e=t.q[i],p=pl(e.p),d=p.hand.find(x=>x.id===e.d);if(!d||off(e.p))continue;
+  const c=hc(p,d);if(G.players.some(o=>o!==p&&o.hand.some(x=>chk('die:swap',x.id,c)))){t.i=i;t.cur=e;return}}
+ t.cur=null;const a=alive();if(a.length<2){G.phase='over';G.winner=a[0]&&a[0].id}else G.phase='res'}
+function doAct(id,d){const p=pl(id),x=p.hand.find(y=>y.id===d.die),D=x&&DICE[x.t],ids=d.picks;
+ if(!D||!D.ok||!Array.isArray(ids))return;const c=hc(p,x);if(!D.ok(c))return;const k=D.pick(c);
+ if(ids.length!==k.length||new Set(ids).size!==ids.length||!k.every((z,i)=>chk(z,ids[i],c)))return;
+ G.msg=D.run(c,k.map((z,i)=>z[0]==='d'?find(G.players,ids[i])[1]:pl(ids[i])));return 1}
+function doThief(d){const e=G.th.cur,p=pl(e.p),x=p.hand.find(y=>y.id===e.d),id=d.picks&&d.picks[0];
+ if(!x||!chk('die:swap',id,hc(p,x)))return;const[o,t]=find(G.players,id);
+ p.hand=p.hand.map(y=>y===x?t:y);o.hand=o.hand.map(y=>y===t?x:y);G.msg=p.name+' steals from '+o.name;return 1}
+function fix(){const a=alive();if(G.phase!=='over'&&a.length<2){G.phase='over';G.winner=a[0]&&a[0].id;return}
+ if(G.phase==='bet'&&!pl(G.turn).hand.length)G.turn=nextAlive(G.turn);
+ else if(G.phase==='act'&&!pl(G.act.cur).hand.length)advAct(G.act.i+1);
+ else if(G.phase==='thief'&&G.th.cur&&!pl(G.th.cur.p).hand.length)advThief(G.th.i+1)}
+function onRoster(){if(G.phase==='lobby'){for(const id in G.ready)if(!roster.some(r=>r.id===id))delete G.ready[id]}
+ else{let ch=0;G.players.forEach(p=>{if(p.hand.length&&!roster.some(r=>r.id===p.id)){p.hand=[];ch=1}});if(ch)fix()}publish()}
+function handle(from,d){if(!G)return;const ph=G.phase,P=G.players;
+ if(ph==='lobby'){
+  if(d.a==='ready'){if(d.picks){let s=0;for(const k in d.picks){const n=d.picks[k];if(!DICE[k]||!Number.isInteger(n)||n<0)return;s+=n}
+   if(s<1||s>G.max)return;G.picks[from]=d.picks;G.ready[from]=1}else delete G.ready[from]}
+  else if(from!==host)return;
+  else if(d.a==='cfg'){G.max=Math.max(1,Math.min(10,d.max|0));G.ready={}}
+  else if(d.a==='start'){if(roster.length<2)return;start()}
+  else return}
+ else if(ph==='bet'){if(from!==G.turn)return;
+  if(d.a==='bet'){const n={q:d.q|0,f:d.f|0};if(n.q<1||n.q>P.reduce((s,p)=>s+p.hand.length,0)||n.f<2||n.f>6||!valid(n,G.bet))return;
+   G.bet={...n,by:from};G.turn=nextAlive(from);G.msg=pl(from).name+' bets '+n.q+' × '+n.f}
+  else if(d.a==='liar'&&G.bet){G.caller=from;P.forEach(p=>p.hand.forEach(x=>x.t==='reroll'&&(x.v=R(6))));
+   G.msg=pl(from).name+' calls '+pl(G.bet.by).name+' a liar!';
+   if(G.mode==='classic')score();else{G.phase='act';G.act={pass:{},i:0,ord:ord(from).map(p=>p.id)};advAct(0)}}
+  else return}
+ else if(ph==='act'){if(from!==G.act.cur)return;
+  if(d.a==='pass')G.act.pass[from]=1;else if(d.a==='act'){if(!doAct(from,d))return}else return;advAct(G.act.i+1)}
+ else if(ph==='thief'){if(!G.th.cur||from!==G.th.cur.p)return;
+  if(d.a==='act'){if(!doThief(d))return}else if(d.a!=='pass')return;advThief(G.th.i+1)}
+ else if(ph==='res'&&d.a==='next'){const l=G.res.loser;G.starter=pl(l).hand.length?l:nextAlive(l);nextRound()}
+ else if(ph==='over'&&d.a==='again'&&from===host){G.phase='lobby';G.players=[];G.ready={};G.picks={};G.msg='';G.winner=null;tx({t:'lock',on:false})}
+ else return;
+ publish()}
+
+// ===== UI =====
+const nm=id=>(S.players.find(p=>p.id===id)||{}).name||'?';
+const dieSq=f=>`<span class="die" style="--c:#18181b">${f}</span>`;
+const cx=()=>{const P=S.players,p=P.find(x=>x.id===me);return ctx(P,p,p.hand.find(d=>d.id===sel.die),S.bet&&S.bet.f)};
+const fire=()=>{send({a:'act',die:sel.die,picks:sel.picks});sel=null;render()};
+const pd=id=>{sel.picks.push(id);sel.picks.length===sel.kinds.length?fire():render()},pp=pd;
+function sa(did){const p=S.players.find(x=>x.id===me),d=p.hand.find(x=>x.id===did);
+ sel={die:did,kinds:DICE[d.t].pick(cx0(did)),picks:[]};sel.kinds.length?render():fire()}
+const cx0=did=>{const P=S.players,p=P.find(x=>x.id===me);return ctx(P,p,p.hand.find(d=>d.id===did),S.bet&&S.bet.f)};
+const hint=()=>'Select '+({'die:opp':"an opponent's die",'die:own':'one of your other dice','die:free':'a die to attach to','die:swap':"an opponent's die showing "+S.bet.f,'player:free':'an opponent (no Shield)'})[sel.kinds[sel.picks.length]];
+function adj(dq,df){const n={q:draft.q+dq,f:draft.f+df};if(n.f<2||n.f>6||n.q<1||n.q>S.players.reduce((s,p)=>s+p.n,0)||!valid(n,S.bet))return;draft=n;render()}
+const cfg=dl=>send({a:'cfg',max:S.max+dl});
+const rdy=()=>send({a:'ready',picks:S.ready[me]?null:{...picks}});
+function pc(k,dl){const n=(picks[k]||0)+dl,u=Object.values(picks).reduce((a,b)=>a+b,0)+dl;if(n<0||u>S.max)return;picks[k]=n;S.ready[me]?send({a:'ready',picks:null}):render()}
+
+function render(){const a=$('#app');
+ if(!code){if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
+  a.innerHTML=`<h1>Liar's Dice</h1><div class=card><div class=row><input placeholder="Your name" maxlength=16 value="${esc(uname)}" oninput="uname=this.value"></div>
+<div class=row><label><input type=radio name=md ${mode==='classic'?'checked':''} onchange="mode='classic'"> Classic</label>
+<label><input type=radio name=md ${mode==='unusual'?'checked':''} onchange="mode='unusual'"> Unusual</label>
+<button class=p onclick="go({t:'create',game:GAME,name:uname})">Create game</button></div>
+<div class=row><input placeholder="CODE" maxlength=4 size=5 value="${esc(ccode)}" oninput="ccode=this.value.toUpperCase()">
+<button onclick="go({t:'join',code:ccode,name:uname})">Join game</button></div><div class=msg style="color:#dc2626">${esc(err)}</div></div>`;return}
+ const H=host===me;
+ a.innerHTML=`<div class=row style="justify-content:space-between"><b>Room ${code}</b><span>${conn?'':'reconnecting… '}<button onclick="${H?"tx({t:'close'})":'leave()'}">${H?'Close room':'Leave'}</button></span></div>`+
+  (!S?'<div class=msg>Waiting for host…</div>':S.phase==='lobby'?lobby():table())}
+
+function lobby(){const un=S.mode==='unusual',H=host===me;
+ if(S.max!==lm){lm=S.max;picks={normal:S.max}}
+ const used=Object.values(picks).reduce((a,b)=>a+b,0),rd=S.ready[me];
+ let h=`<div class=card><b>${un?'Unusual':'Classic'} mode</b> · ${S.max} dice each<div>${roster.map(r=>esc(r.name)+(r.id===host?' ★':'')+(un&&S.ready[r.id]?' ✓':'')+(r.online?'':' (offline)')).join(', ')}</div></div>`;
+ if(H)h+=`<div class=row>Dice each <button onclick="cfg(-1)">−</button><b>${S.max}</b><button onclick="cfg(1)">+</button></div>`;
+ if(un)h+=`<div class=card><b>Choose your dice</b> (${used}/${S.max})`+Object.keys(DICE).map(k=>`<div class=row style="justify-content:space-between;margin:4px 0"><span style="text-align:left"><span class="die sm" style="--c:${DICE[k].c}"></span> <b>${DICE[k].n}</b><br><small style="color:#71717a">${DICE[k].d}</small></span><span><button onclick="pc('${k}',-1)">−</button> ${picks[k]||0} <button onclick="pc('${k}',1)">+</button></span></div>`).join('')+
+  `<div class=row><button class=p onclick="rdy()" ${used<1||used>S.max?'disabled':''}>${rd?'Not ready':'Ready'}</button></div></div>`;
+ return h+(H?`<div class=row><button class=p onclick="send({a:'start'})" ${roster.length<2?'disabled':''}>Start game</button></div>${roster.length<2?'<div class=msg>Need at least 2 players</div>':''}`:'<div class=msg>Waiting for the host to start…</div>')}
+
+function dh(d,P,c,k){const D=DICE[d.t],s=sv(P,d),e=ev(P,d),b=S.bet,m=b&&(e===b.f||e===1),t=k&&k[0]==='d'&&!sel.picks.includes(d.id)&&chk(k,d.id,c);
+ return`<span class="die sm ${m?'m':'x'} ${t?'t':''}" style="--c:${D.c}" title="${D.n}: ${D.d}" ${t?`onclick="pd(${d.id})"`:''}>${s}${d.t==='little'?`<small>${e}</small>`:''}${d.l?'<small style="left:2px;right:auto">+</small>':''}</span>`}
+
+function table(){const P=S.players,N=P.length,mi=Math.max(0,P.findIndex(p=>p.id===me)),ph=S.phase,b=S.bet,H=host===me;
+ const cur=ph==='bet'?S.turn:ph==='act'?S.act.cur:ph==='thief'&&S.th.cur?S.th.cur.p:null;
+ if(ph==='thief'&&cur===me&&(!sel||sel.die!==S.th.cur.d))sel={die:S.th.cur.d,kinds:['die:swap'],picks:[]};
+ else if(sel&&!(cur===me&&(ph==='act'||ph==='thief')))sel=null;
+ const c=sel&&cx(),k=sel&&sel.kinds[sel.picks.length];
+ const ring=P.map((p,i)=>{const an=(90+(i-mi)*360/N)*Math.PI/180,r=roster.find(x=>x.id===p.id),ofl=!r||!r.online,tp=k&&k[0]==='p'&&chk(k,p.id,c);
+  const ds=p.hand?p.hand.map(d=>dh(d,P,c,k)).join(''):'<span class="die sm h">?</span>'.repeat(p.n);
+  return`<div class="n ${p.id===cur?'on':''} ${p.n?'':'out'} ${tp?'t':''}" style="left:${50+35*Math.cos(an)}%;top:${50+35*Math.sin(an)}%" ${tp?`onclick="pp('${p.id}')"`:''}><b>${esc(p.name)}</b>${p.id===me?' (you)':''}${ofl?' · offline':''}<div>${ds||'out'}</div>${ofl&&H&&p.n?`<button onclick="tx({t:'kick',id:'${p.id}'})">Kick</button>`:''}</div>`}).join('');
+ const ctr=S.res&&(ph==='res'||ph==='over')?`<b style="font-size:22px">${S.res.total}</b><br><small>counted (bet ${b.q} × ${b.f})</small>`:
+  b?`<div style="font-size:26px;font-weight:700">${b.q} × ${dieSq(b.f)}</div><small>${esc(nm(b.by))}</small>`:'<small>No bet yet</small>';
+ return`<div class=ring>${ring}<div class=ctr>${ctr}</div></div><div class=msg>${esc(S.msg||'')}</div>`+ctl(P,P[mi],cur)}
+
+function ctl(P,mp,cur){const ph=S.phase;
+ if(ph==='bet'){let h=`<div class=row>${myDice.map(d=>`<span class=die style="--c:${DICE[d.t].c}" title="${DICE[d.t].n}: ${DICE[d.t].d}">${d.v}</span>`).join('')}</div>`;
+  if(S.turn!==me)return h+`<div class=msg>Waiting for ${esc(nm(S.turn))}…</div>`;
+  const key=S.round+'|'+(S.bet?S.bet.q+'x'+S.bet.f:'');
+  if(dk!==key){dk=key;draft=S.bet?(S.bet.f<6?{q:S.bet.q,f:S.bet.f+1}:{q:S.bet.q+1,f:2}):{q:1,f:2}}
+  const ok=draft.q<=P.reduce((s,p)=>s+p.n,0)&&valid(draft,S.bet);
+  return h+`<div class=row>Quantity <button onclick="adj(-1,0)">−</button><b>${draft.q}</b><button onclick="adj(1,0)">+</button> &nbsp; Face <button onclick="adj(0,-1)">−</button>${dieSq(draft.f)}<button onclick="adj(0,1)">+</button></div>
+<div class=row><button class=p onclick="send({a:'bet',q:draft.q,f:draft.f})" ${ok?'':'disabled'}>Confirm bet</button></div>${S.bet?`<button class=r onclick="send({a:'liar'})">LIAR</button>`:''}`}
+ if(ph==='act'){if(cur!==me)return`<div class=msg>${esc(nm(cur))} is choosing an action…</div>`;
+  if(sel)return`<div class=msg>${hint()}</div><div class=row><button onclick="sel=null;render()">Cancel</button></div>`;
+  return`<div class=msg>Your action</div><div class=row>${acts(P,mp,S.bet.f).map(d=>`<button onclick="sa(${d.id})"><span class="die sm" style="--c:${DICE[d.t].c}">${sv(P,d)}</span> ${DICE[d.t].n}</button>`).join('')}<button onclick="send({a:'pass'})">Pass</button></div>`}
+ if(ph==='thief')return cur===me?`<div class=msg>Thief: ${hint()}</div><div class=row><button onclick="send({a:'pass'})">Skip</button></div>`:`<div class=msg>${cur?esc(nm(cur))+' is deciding on a Thief swap…':''}</div>`;
+ const r=S.res;
+ if(ph==='res')return`<div class=card style="text-align:center"><b>${r.total}</b> dice count for ${S.bet.f}s against a bet of ${S.bet.q}. <b>${esc(nm(r.loser))}</b> loses ${r.lost?'a '+DICE[r.lost].n+' die':'a die'}.</div><div class=row><button class=p onclick="send({a:'next'})">Next round</button></div>`;
+ return`<div class=card style="text-align:center;font-size:20px"><b>${esc(nm(S.winner))}</b> wins!</div>${host===me?`<div class=row><button class=p onclick="send({a:'again'})">Back to lobby</button></div>`:''}`}
+
+try{const s=JSON.parse(sessionStorage.s||'null');if(s){code=s.code;token=s.token;open({t:'rejoin',code,token})}}catch{}
+render();
+</script></body></html>
