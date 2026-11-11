@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Liar's Dice</title>
+<title>Dice Game</title>
 <style>:root{--bg:#fff;--fg:#18181b;--mut:#71717a;--line:#c4c4cc;--tbl:#efeff1}
 [data-theme=dark]{--bg:#18181b;--fg:#f4f4f5;--mut:#a1a1aa;--line:#52525b;--tbl:#2a2a2e}
 *{box-sizing:border-box}body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--fg)}
@@ -27,7 +27,7 @@ h1{font-size:22px;text-align:center}h3{margin:16px 0 4px}
 </style></head><body><div id="app"></div>
 <script>
 // ===== CONFIG: set this to your Pi's websocket URL =====
-const SERVER='wss://YOUR-PI-HOSTNAME', GAME='liarsdice';
+const SERVER = 'wss://ws.evansolid.com', GAME='dice-game';
 
 // ===== DICE TYPES: add a new die by adding an entry here =====
 // n=name c=color d=description. Optional action: ok(ctx)->can use, pick(ctx)->list of target kinds
@@ -181,7 +181,7 @@ function setc(k,v){cs[k]=v;try{localStorage.cs=JSON.stringify(cs)}catch{}render(
 const sopt=(k,l)=>`<select onchange="setc('${k}',this.value)">${l.map(([v,t])=>`<option value="${v}"${cs[k]===v?' selected':''}>${t}</option>`).join('')}</select>`;
 const settings=()=>showSet?`<div class=row><label>Theme ${sopt('theme',[['light','Light'],['dark','Dark']])}</label><label>Dice ${sopt('faces',[['numbers','Numbers'],['pips','Pips']])}</label><label>Sort my dice ${sopt('sort',[['off','Off'],['on','On']])}</label></div>`:'';
 
-const menu=()=>`<h1>Liar's Dice</h1>
+const menu=()=>`<h1>Dice Game</h1>
 <div class=row><input placeholder="Your name" maxlength=16 value="${esc(uname)}" oninput="uname=this.value"></div>
 <div class=row><label><input type=radio name=md ${mode==='classic'?'checked':''} onchange="mode='classic'"> Classic</label>
 <label><input type=radio name=md ${mode==='unusual'?'checked':''} onchange="mode='unusual'"> Unusual</label></div>
