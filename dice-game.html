@@ -23,7 +23,7 @@ h1{font-size:22px;text-align:center}h3{margin:16px 0 4px}
 .n{position:absolute;transform:translate(-50%,-50%);text-align:center;font-size:11px;width:92px;padding:3px;border-radius:8px;border:2px solid transparent}
 .n.on{border-color:var(--fg)}.n.out{opacity:.35}.n.t{outline:3px solid #2563eb;cursor:pointer}
 .n button{padding:1px 6px;font-size:11px}.col{display:flex;flex-direction:column;align-items:center}
-.ctr{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:36%;line-height:1.25}
+.ctr{pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:36%;line-height:1.25}
 </style></head><body><div id="app"></div>
 <script>
 // ===== CONFIG: set this to your Pi's websocket URL =====
@@ -72,7 +72,7 @@ const acts=(P,p,f)=>p.hand.filter(d=>{const D=DICE[d.t];return D.ok&&D.ok(ctx(P,
 const valid=(n,b)=>!b||n.q>b.q||n.q===b.q&&n.f>b.f;
 
 // ===== NETWORK =====
-let ws,me,host,code,token,roster=[],S=null,G=null,myDice=[],mode='classic',err='',conn=0,sel=null,draft=null,dk='',picks={normal:5},lm=5,uname='',ccode='';
+let ws,me,host,code,token,roster=[],S=null,G=null,myDice=[],mode='classic',err='',conn=0,sel=null,draft=null,dk='',picks={},lm=5,uname='',ccode='';
 const tx=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))};
 function open(first){ws=new WebSocket(SERVER);ws.onopen=()=>{conn=1;tx(first);render()};ws.onmessage=e=>onMsg(JSON.parse(e.data));
  ws.onclose=()=>{conn=0;if(code&&token)setTimeout(()=>open({t:'rejoin',code,token}),2000);render()}}
@@ -139,14 +139,14 @@ function onRoster(){if(G.phase==='lobby'){for(const id in G.ready)if(!roster.som
 function handle(from,d){if(!G)return;const ph=G.phase,P=G.players;
  if(ph==='lobby'){
   if(d.a==='ready'){if(d.picks){let s=0;for(const k in d.picks){const n=d.picks[k];if(!DICE[k]||!Number.isInteger(n)||n<0)return;s+=n}
-   if(s<1||s>G.max)return;G.picks[from]=d.picks;G.ready[from]=1}else delete G.ready[from]}
+   if(s<1||s>G.max)return;G.picks[from]=d.picks;G.ready[from]=1;if(G.mode==='unusual'&&roster.length>1&&roster.every(r=>G.ready[r.id]))start()}else delete G.ready[from]}
   else if(from!==host)return;
   else if(d.a==='cfg'){G.max=Math.max(1,Math.min(10,d.max|0));G.ready={}}
   else if(d.a==='start'){if(roster.length<2)return;start()}
   else return}
  else if(ph==='bet'){if(from!==G.turn)return;
   if(d.a==='bet'){const n={q:d.q|0,f:d.f|0};if(n.q<1||n.q>P.reduce((s,p)=>s+p.hand.length,0)||n.f<2||n.f>6||!valid(n,G.bet))return;
-   if(G.bet)G.hist.push([G.bet.q,G.bet.f]);G.bet={...n,by:from};G.turn=nextAlive(from);G.msg=pl(from).name+' bets '+n.q+' × '+n.f}
+   if(G.bet)G.hist.push([G.bet.q,G.bet.f]);G.bet={...n,by:from};G.turn=nextAlive(from);G.msg=pl(from).name+' bets '+bt(n.q,n.f)}
   else if(d.a==='liar'&&G.bet){G.caller=from;P.forEach(p=>p.hand.forEach(x=>x.t==='reroll'&&(x.v=R(6))));
    G.msg=pl(from).name+' calls '+pl(G.bet.by).name+' a liar!';
    if(G.mode==='classic')score();else{G.phase='act';G.act={pass:{},i:0,ord:ord(from).map(p=>p.id)};advAct(0)}}
@@ -161,10 +161,12 @@ function handle(from,d){if(!G)return;const ph=G.phase,P=G.players;
  publish()}
 
 // ===== UI =====
-let cs={theme:'light',faces:'numbers',sort:'off'},showSet=false;
+let cs={theme:'light',faces:'pips',sort:'off'},showSet=false,showHelp=false;
 try{cs={...cs,...JSON.parse(localStorage.cs)}}catch{}
 const PIP=[0,[4],[0,8],[0,4,8],[0,2,6,8],[0,2,4,6,8],[0,2,3,5,6,8]];
 const face=v=>cs.faces==='pips'?`<span class=pp>${[0,1,2,3,4,5,6,7,8].map(i=>`<i${PIP[v].includes(i)?' class=o':''}></i>`).join('')}</span>`:v;
+const W='zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(' '),T='  twenty thirty forty fifty sixty seventy eighty ninety'.split(' ');
+const wd=n=>n<20?W[n]:T[n/10|0]+(n%10?'-'+W[n%10]:''),bt=(q,f)=>q===1?'one '+f:wd(q)+' '+f+'s';
 const nm=id=>(S.players.find(p=>p.id===id)||{}).name||'?';
 const srt=(h,P)=>cs.sort==='on'?[...h].sort((a,b)=>sv(P,a)-sv(P,b)):h;
 const dieSq=f=>`<span class=die style="--c:#18181b">${face(f)}</span>`;
@@ -172,15 +174,16 @@ const cx0=id=>{const P=S.players,p=P.find(x=>x.id===me);return ctx(P,p,p.hand.fi
 const cx=()=>cx0(sel.die);
 const fire=()=>{send({a:'act',die:sel.die,picks:sel.picks});sel=null;render()};
 const pd=id=>{sel.picks.push(id);sel.picks.length===sel.kinds.length?fire():render()},pp=pd;
-function sa(did){const d=S.players.find(x=>x.id===me).hand.find(x=>x.id===did);sel={die:did,kinds:DICE[d.t].pick(cx0(did)),picks:[]};sel.kinds.length?fire():render()}
+function sa(did){const d=S.players.find(x=>x.id===me).hand.find(x=>x.id===did);sel={die:did,kinds:DICE[d.t].pick(cx0(did)),picks:[]};sel.kinds.length?render():fire()}
 const hint=()=>'Select '+({'die:opp':"an opponent's die",'die:own':'one of your other dice','die:free':'a die to attach to','die:swap':"an opponent's die showing "+S.bet.f,'player:free':'an opponent (no Shield)'})[sel.kinds[sel.picks.length]];
 const cfg=dl=>send({a:'cfg',max:S.max+dl});
 const rdy=()=>send({a:'ready',picks:S.ready[me]?null:{...picks}});
-function pk(v,k){picks[k]=+v;S.ready[me]?send({a:'ready',picks:null}):render()}
+function pk(k,dl){const n=(picks[k]||0)+dl;if(n<0||Object.values(picks).reduce((a,b)=>a+b,0)+dl>S.max)return;picks[k]=n;S.ready[me]?send({a:'ready',picks:null}):render()}
 function setc(k,v){cs[k]=v;try{localStorage.cs=JSON.stringify(cs)}catch{}render()}
 const sopt=(k,l)=>`<select onchange="setc('${k}',this.value)">${l.map(([v,t])=>`<option value="${v}"${cs[k]===v?' selected':''}>${t}</option>`).join('')}</select>`;
 const settings=()=>showSet?`<div class=row><label>Theme ${sopt('theme',[['light','Light'],['dark','Dark']])}</label><label>Dice ${sopt('faces',[['numbers','Numbers'],['pips','Pips']])}</label><label>Sort my dice ${sopt('sort',[['off','Off'],['on','On']])}</label></div>`:'';
 
+const help=()=>showHelp&&S&&S.mode==='unusual'?`<div class=rules>${Object.values(DICE).map(D=>`<p><span class="die sm" style="--c:${D.c}"></span> <b>${D.n}</b>: ${D.d}</p>`).join('')}</div>`:'';
 const menu=()=>`<h1>Dice Game</h1>
 <div class=row><input placeholder="Your name" maxlength=16 value="${esc(uname)}" oninput="uname=this.value"></div>
 <div class=row><label><input type=radio name=md ${mode==='classic'?'checked':''} onchange="mode='classic'"> Classic</label>
@@ -195,18 +198,20 @@ const menu=()=>`<h1>Dice Game</h1>
 <p>Unusual mode adds special dice types with abilities. After Liar is called, players take turns using them before the count.</p></div>`;
 
 function render(){document.body.dataset.theme=cs.theme;const a=$('#app'),H=host===me;
- const bar=`<div class=row style="justify-content:space-between"><b>${code&&(!S||S.phase==='lobby')?'Room '+code:''}</b><span>${conn||!code?'':'reconnecting… '}<button onclick="showSet=!showSet;render()">Settings</button>${code?` <button onclick="${H?"tx({t:'close'})":'leave()'}">${H?'Close room':'Leave'}</button>`:''}</span></div>${settings()}`;
+ const bar=`<div class=row style="justify-content:space-between"><b>${code&&(!S||S.phase==='lobby')?'Room '+code:''}</b><span>${conn||!code?'':'reconnecting… '}${S&&S.mode==='unusual'?`<button onclick="showHelp=!showHelp;render()">?</button> `:''}<button onclick="showSet=!showSet;render()">Settings</button>${code?` <button onclick="${H?"tx({t:'close'})":'leave()'}">${H?'Close room':'Leave'}</button>`:''}</span></div>${settings()}${help()}`;
  if(!code){if(document.activeElement&&document.activeElement.tagName==='INPUT')return;a.innerHTML=bar+menu();return}
  a.innerHTML=bar+(!S?'<div class=msg>Waiting for host…</div>':S.phase==='lobby'?lobby():table())}
 
 function lobby(){const un=S.mode==='unusual',H=host===me;
- if(S.max!==lm){lm=S.max;picks={normal:S.max}}
- const used=Object.values(picks).reduce((a,b)=>a+b,0),rd=S.ready[me];
- let h=`<div class=msg><b>${un?'Unusual':'Classic'} mode</b><br>${roster.map(r=>esc(r.name)+(r.id===host?' (host)':'')+(un&&S.ready[r.id]?' ✓':'')+(r.online?'':' (offline)')).join(', ')}</div>
+ if(S.max!==lm){lm=S.max;picks={}}
+ const ks=Object.keys(DICE),used=Object.values(picks).reduce((a,b)=>a+b,0),rd=S.ready[me],sl=[];
+ ks.forEach(k=>{for(let i=0;i<(picks[k]||0);i++)sl.push(k)});
+ let h=un?`<div class=row>${Array.from({length:S.max},(_,i)=>`<span class="die${sl[i]?'':' h'}"${sl[i]?` style="--c:${DICE[sl[i]].c}"`:''}></span>`).join('')}</div>`:'';
+ h+=`<div class=msg><b>${un?'Unusual':'Classic'} mode</b><br>${roster.map(r=>esc(r.name)+(r.id===host?' (host)':'')+(un&&S.ready[r.id]?' ✓':'')+(r.online?'':' (offline)')).join(', ')}</div>
 <div class=row style="flex-direction:column;gap:4px;margin:16px 0">Dice each<b style="font-size:44px;line-height:1">${S.max}</b>${H?`<div><button onclick="cfg(-1)">−</button> <button onclick="cfg(1)">+</button></div>`:''}</div>`;
- if(un)h+=`<h3 style="text-align:center">Choose your dice (${used}/${S.max})</h3>`+Object.keys(DICE).map(k=>`<div class=row style="justify-content:space-between;flex-wrap:nowrap"><span><span class="die sm" style="--c:${DICE[k].c}"></span> <b>${DICE[k].n}</b><br><small>${DICE[k].d}</small></span><select onchange="pk(this.value,'${k}')">${Array.from({length:S.max+1},(_,i)=>`<option${(picks[k]||0)===i?' selected':''}>${i}</option>`).join('')}</select></div>`).join('')+
-  `<div class=row><button onclick="rdy()" ${used<1||used>S.max?'disabled':''}>${rd?'Not ready':'Ready'}</button></div>`;
- return h+(H?`<div class=row><button onclick="send({a:'start'})" ${roster.length<2?'disabled':''}>Start game</button></div>`:'<div class=msg>Waiting for the host to start…</div>')+`<div class=msg>No one can join once the game starts.${H&&roster.length<2?' You need at least 2 players.':''}</div>`}
+ if(un)h+=ks.map(k=>`<div class=row style="justify-content:space-between;flex-wrap:nowrap"><span><span class="die sm" style="--c:${DICE[k].c}"></span> <b>${DICE[k].n}</b></span><span><button onclick="pk('${k}',-1)" ${picks[k]?'':'disabled'}>−</button> <b>${picks[k]||0}</b> <button onclick="pk('${k}',1)" ${used<S.max?'':'disabled'}>+</button></span></div>`).join('')+
+  `<div class=row><button onclick="rdy()" ${used<1?'disabled':''}>${rd?'Not ready':'Ready'}</button></div><div class=msg>The game starts when everyone is ready.</div>`;
+ return h+(H?`<div class=row><button onclick="send({a:'start'})" ${roster.length<2?'disabled':''}>Start game</button></div>`:'')+`<div class=msg>No one can join once the game starts.${H&&roster.length<2?' You need at least 2 players.':''}</div>`}
 
 function dh(d,P,c,k){const D=DICE[d.t],e=ev(P,d),b=S.bet,mt=e===b.f||e===1,t=k&&k[0]==='d'&&!sel.picks.includes(d.id)&&chk(k,d.id,c);
  return`<span class="die sm${t?' t':mt?'':' dim'}" style="--c:${D.c}" title="${D.n}: ${D.d}" ${t?`onclick="pd(${d.id})"`:''}>${face(sv(P,d))}${d.t==='little'?`<small>${e}</small>`:''}${d.l?'<small style="left:2px;right:auto">+</small>':''}</span>`}
@@ -223,8 +228,8 @@ function table(){const P=S.players,N=P.length,mi=Math.max(0,P.findIndex(p=>p.id=
   const ds=p.hand?rev(p,P,c,k,an):'<span class="die sm h"></span>'.repeat(p.n);
   return`<div class="n${p.id===cur?' on':''}${p.n?'':' out'}${tp?' t':''}" style="left:${50+35*Math.cos(an)}%;top:${50+35*Math.sin(an)}%" ${tp?`onclick="pp('${p.id}')"`:''}><b>${esc(p.name)}</b>${p.id===me?' (you)':''}${ofl?' · offline':''}<div>${ds||'out'}</div>${ofl&&H&&p.n?`<button onclick="tx({t:'kick',id:'${p.id}'})">Kick</button>`:''}</div>`}).join('');
  const hs=(S.hist||[]).slice(-3);
- const ctr=S.res&&(ph==='res'||ph==='over')?`<b style="font-size:22px">${S.res.total}</b><br><small>counted for ${b.q} × ${b.f}s</small>`:
-  b?`<div class=mut style="font-size:12px">${hs.map(([q,f],i)=>`<div style="opacity:${[.25,.4,.6][3-hs.length+i]}">${q} × ${f}s</div>`).join('')}</div><div style="font-size:24px;font-weight:700">${b.q} × ${dieSq(b.f)}</div><small>${esc(nm(b.by))}</small>`:'<small>No bet yet</small>';
+ const ctr=S.res&&(ph==='res'||ph==='over')?`<b style="font-size:22px">${S.res.total}</b><br><small>${b.f}s counted</small>`:
+  b?`<div class=mut style="font-size:12px">${hs.map(([q,f],i)=>`<div style="opacity:${[.25,.4,.6][3-hs.length+i]}">${bt(q,f)}</div>`).join('')}</div><div style="font-size:19px;font-weight:700">${bt(b.q,b.f)}</div><small>${esc(nm(b.by))}</small>`:'<small>No bet yet</small>';
  const ty=ph==='bet'||S.mode!=='unusual'?[]:[...new Set(P.flatMap(p=>(p.hand||[]).map(d=>d.t)))];
  return`<div class=ring>${ring}<div class=ctr>${ctr}</div></div>${ty.length?`<div class=row style="font-size:11px;gap:10px">${ty.map(t=>`<span><span class="die sm" style="--c:${DICE[t].c}"></span> ${DICE[t].n}</span>`).join('')}</div>`:''}<div class=msg>${esc(S.msg||'')}</div>`+ctl(P,P[mi],cur)}
 
@@ -234,14 +239,14 @@ function ctl(P,mp,cur){const ph=S.phase,b=S.bet;
   if(S.turn!==me)return h+`<div class=msg>Waiting for ${esc(nm(S.turn))}…</div>`;
   const o=[];for(let q=b?b.q:1;q<=tot;q++)for(let f=2;f<=6;f++)if(valid({q,f},b))o.push([q,f]);
   const key=S.round+'|'+(b?b.q+'x'+b.f:'');if(dk!==key){dk=key;draft=o.length?{q:o[0][0],f:o[0][1]}:null}
-  return h+(o.length?`<div class=box><b>Your bet</b><br><select size=5 style="width:100%;margin:8px 0" onchange="const[q,f]=this.value.split('x');draft={q:+q,f:+f}">${o.map(([q,f])=>`<option value="${q}x${f}"${draft&&draft.q===q&&draft.f===f?' selected':''}>${q} × ${f}s</option>`).join('')}</select><br><button onclick="send({a:'bet',q:draft.q,f:draft.f})">Confirm bet</button></div>`:'')+
+  return h+(o.length?`<div class=box><b>Your bet</b><br><select size=5 style="width:100%;margin:8px 0" onchange="const[q,f]=this.value.split('x');draft={q:+q,f:+f}">${o.map(([q,f])=>`<option value="${q}x${f}"${draft&&draft.q===q&&draft.f===f?' selected':''}>${bt(q,f)}</option>`).join('')}</select><br><button onclick="send({a:'bet',q:draft.q,f:draft.f})">Confirm bet</button></div>`:'')+
    (b?`<button class=r onclick="send({a:'liar'})">Call ${esc(nm(b.by))} a Liar</button>`:'')}
  if(ph==='act'){if(cur!==me)return`<div class=msg>${esc(nm(cur))} is choosing an action…</div>`;
   if(sel)return`<div class=msg>${hint()}</div><div class=row><button onclick="sel=null;render()">Cancel</button></div>`;
   return`<div class=msg>Your action</div><div class=row>${acts(P,mp,b.f).map(d=>`<button onclick="sa(${d.id})">${DICE[d.t].n} (${sv(P,d)})</button>`).join('')}<button onclick="send({a:'pass'})">Pass</button></div>`}
  if(ph==='thief')return cur===me?`<div class=msg>Thief: ${hint()}</div><div class=row><button onclick="send({a:'pass'})">Skip</button></div>`:`<div class=msg>${cur?esc(nm(cur))+' is deciding on a Thief swap…':''}</div>`;
  const r=S.res;
- if(ph==='res')return`<div class=msg style="color:var(--fg)"><b>${r.total}</b> dice count for ${b.f}s against a bet of ${b.q}. <b>${esc(nm(r.loser))}</b> loses ${r.lost?'a '+DICE[r.lost].n+' die':'a die'}.</div><div class=row><button onclick="send({a:'next'})">Next round</button></div>`;
+ if(ph==='res')return`<div class=msg style="color:var(--fg)">${r.total} ${r.total===1?'die':'dice'} on the table ${r.total===1?'is a':'are'} ${b.f}${r.total===1?'':'s'}, which ${r.ok?'is':'is not'} greater than or equal to the bet of ${b.q} ${b.q===1?'die':'dice'}. <b>${esc(nm(r.loser))}</b> loses ${r.lost?'a '+DICE[r.lost].n+' die':'a die'}.</div><div class=row><button onclick="send({a:'next'})">Next round</button></div>`;
  return`<div class=row style="font-size:20px"><b>${esc(nm(S.winner))}</b> wins!</div>${host===me?`<div class=row><button onclick="send({a:'again'})">Back to lobby</button></div>`:''}`}
 
 try{const s=JSON.parse(sessionStorage.s||'null');if(s){code=s.code;token=s.token;open({t:'rejoin',code,token})}}catch{}
